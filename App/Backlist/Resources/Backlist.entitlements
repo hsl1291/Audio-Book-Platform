@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- CloudKit private database carries the tracking graph only: shelves,
+         ratings, reviews, positions. Audio files are never synced — they stay on
+         each device and are re-fetched, which is what keeps a 41 GB library
+         inside a free iCloud tier. -->
+    <key>com.apple.developer.icloud-services</key>
+    <array>
+        <string>CloudKit</string>
+    </array>
+    <key>com.apple.developer.icloud-container-identifiers</key>
+    <array>
+        <string>iCloud.com.backlist.app</string>
+    </array>
+
+    <!-- Required for SwiftData's CloudKit mirroring. -->
+    <key>aps-environment</key>
+    <string>development</string>
+
+    <!-- CarPlay audio is NOT requested here on purpose.
+         The entitlement must be granted by Apple and is normally reserved for
+         App Store apps, so a personal build may never receive one. Adding the key
+         without the grant makes the app fail to sign.
+
+         Nothing is lost by leaving it out: MPNowPlayingInfoCenter and
+         MPRemoteCommandCenter need no entitlement and already provide cover art,
+         title, chapter, scrub position and steering-wheel controls on the CarPlay
+         Now Playing screen. Only browsing the library on the car screen requires
+         the grant.
+
+         If Apple grants it, uncomment:
+         <key>com.apple.developer.carplay-audio</key>
+         <true/>
+    -->
+</dict>
+</plist>

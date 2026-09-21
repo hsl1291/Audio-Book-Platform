@@ -24,6 +24,8 @@ The repository is laid out specifically to make that first check fast.
 Package.swift              SPM package — Foundation only, builds anywhere
 Sources/BacklistCore/      all parsing, matching and policy logic
 Tests/BacklistCoreTests/   runs with `swift test`, no Xcode, no simulator
+App/Backlist/              the iOS app: SwiftUI, SwiftData, AVFoundation
+project.yml                XcodeGen spec for the app target
 ```
 
 `BacklistCore` deliberately imports **nothing but Foundation**. No SwiftUI, no
@@ -48,9 +50,31 @@ the import logic is correct.
 | `MatchKey` | Normalises titles and authors so the same book matches across sources | Real title/subtitle/diacritic variants |
 | `DuplicateResolver` | Collapses the same book appearing in several folders, reports reclaimable space | The real 202-folder / 106-book shape |
 | `DiscoveredItem` | One found file, plus shelf inference from its path | The nested dump-folder trap |
+| `StoragePolicy` | What stays on the phone out of 41 GB, and what to fetch next | Pinning, eviction order, disk pressure |
+| `GoogleDriveSource` / `LocalFilesSource` | Two interchangeable ways to find files | Drive's quirks, iCloud placeholders |
 
 Models (`Work`, `BookCopy`, `Shelf`, `Journal`, `PlaybackPosition`) are plain value
 types. The SwiftData `@Model` layer sits above them in the app target.
+
+The app target adds the four screens (Waiting to Read, Want, Read, Book Detail),
+the player, and the Now Playing bridge. **None of it is covered by `swift test`** —
+it needs a simulator, and it is the least verified code in the repository.
+
+## Building the app
+
+```sh
+brew install xcodegen
+xcodegen generate
+open Backlist.xcodeproj
+```
+
+Before the first build on a device, set `DEVELOPMENT_TEAM` in `project.yml`. The
+paid Apple Developer Program is effectively required: on a free account
+provisioning expires every seven days and the app stops launching, which is not
+acceptable for something holding your listening position.
+
+The `.xcodeproj` is generated rather than committed — it is large, merge-hostile,
+and adds nothing to version control when the inputs are this simple.
 
 ## The one principle everything follows
 
