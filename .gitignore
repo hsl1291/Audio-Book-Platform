@@ -1,0 +1,37 @@
+## Swift / SPM
+.build/
+.swiftpm/
+Package.resolved
+*.o
+*.swiftmodule
+
+## Xcode
+DerivedData/
+build/
+*.xcuserstate
+*.xcuserdatad/
+xcuserdata/
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+## Secrets — the OAuth client config must never be committed
+Secrets.xcconfig
+GoogleService-Info.plist
+client_secret*.json
+
+## Personal library data — exports contain reading history and reviews
+*.goodreads.csv
+goodreads_library_export*.csv
+KindleLibrary*.csv
+/LocalFixtures/
+
+## Media — never commit audiobooks
+*.m4b
+*.m4a
+*.mp3
+
+## macOS
+.DS_Store
