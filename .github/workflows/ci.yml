@@ -1,0 +1,52 @@
+name: CI
+
+# BacklistCore is Foundation-only on purpose, so the fast job runs in a plain
+# Swift container with no Xcode and no simulator. That is the loop that matters:
+# it covers every judgement call in parsing, matching, identification and the
+# storage policy.
+#
+# The app target needs macOS, which costs ten times the minutes on a private
+# repo, so it is manual-dispatch only rather than running on every push.
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  core:
+    name: BacklistCore (Linux)
+    runs-on: ubuntu-latest
+    container: swift:6.0
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: swift build --build-tests
+
+      - name: Test
+        run: swift test --parallel
+
+  app:
+    name: iOS app build (macOS)
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate project
+        run: xcodegen generate
+
+      - name: Build for simulator
+        # No signing: a simulator build proves the code compiles without
+        # needing a development team or a provisioning profile.
+        run: |
+          xcodebuild build \
+            -project Backlist.xcodeproj \
+            -scheme Backlist \
+            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            CODE_SIGNING_ALLOWED=NO
