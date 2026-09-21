@@ -79,14 +79,12 @@ public enum CSVParser {
                 quoteOpenedAtRow = rows.count
             case ",":
                 endField()
-            case "\r":
-                // Swallow CR; a following LF ends the row, a lone CR ends it too.
-                if let peek = nextCharacter() {
-                    if peek == "\n" { endRow() } else { endRow(); pending = peek }
-                } else {
-                    endRow()
-                }
-            case "\n":
+            case "\r\n", "\n", "\r":
+                // Swift iterates by grapheme cluster and CRLF is a *single*
+                // Character, not a CR followed by an LF. Matching only "\r" and
+                // "\n" therefore never fires on a Windows-authored file: the
+                // terminator falls through to `default` and is appended into the
+                // field, collapsing the whole document into one row.
                 endRow()
             default:
                 field.append(char)
