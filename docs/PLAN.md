@@ -159,10 +159,23 @@ Since files will come from varied stores, identification is a cascade:
    search. There will always be a tail; make correcting it pleasant rather than
    trying to be perfect.
 
-**Metadata without downloading 400 MB.** MP4 metadata lives in the `moov` atom. Issue
-two HTTP **range requests** — first ~2 MB and last ~2 MB — to capture `moov` whether
-the file is faststart or not, parse `ilst`, extract the embedded `covr` artwork. Full
-library metadata and covers for a few MB instead of 41 GB.
+**Metadata without downloading 400 MB.** MP4 metadata lives in the `moov` atom.
+
+*Superseded during implementation.* The original approach here was to fetch a fixed
+~2 MB window from each end of the file and hope `moov` fell inside one of them. The
+implemented approach is better and simpler: an MP4 file is a flat chain of top-level
+atoms and **every header states its own length**, so the chain can be walked — read
+16 bytes, learn the size, seek past it, repeat. Locating `moov` costs three or four
+16-byte reads regardless of where it sits or how large `mdat` is, and only then is
+`moov` itself fetched.
+
+This is exact rather than heuristic, transfers less, and cannot be defeated by an
+unusually large `moov`. See `MP4AtomReader`, and `testWalkSkipsLargeMdatWithoutReadingIt`
+which asserts the payload is never transferred.
+
+Chapters are deliberately *not* parsed this way — they live in a separate track whose
+sample tables are expensive to walk, and once a file is on the device
+`AVAsset.chapterMetadataGroups` reads them correctly for free.
 
 ### Storage policy engine — the load-bearing piece
 
