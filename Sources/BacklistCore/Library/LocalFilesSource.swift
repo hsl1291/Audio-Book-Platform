@@ -1,5 +1,10 @@
 import Foundation
 
+#if canImport(FoundationNetworking)
+// URLRequest lives here rather than in Foundation on non-Apple platforms.
+import FoundationNetworking
+#endif
+
 /// Reads a folder on the local file system, including an iCloud Drive folder.
 ///
 /// This is the no-authentication path. If the `drive.readonly` token lifetime turns
@@ -137,7 +142,11 @@ public struct LocalFilesSource: LibrarySource {
     func ensureMaterialised(at url: URL, timeout: TimeInterval = 30) async throws {
         if fileManager.fileExists(atPath: url.path) { return }
 
+        #if canImport(Darwin)
+        // iCloud ubiquity has no equivalent outside Apple's platforms. Elsewhere
+        // a missing file is simply missing, which the timeout below reports.
         try fileManager.startDownloadingUbiquitousItem(at: url)
+        #endif
 
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
@@ -152,10 +161,9 @@ public struct LocalFilesSource: LibrarySource {
 ///
 /// A 920 MB audiobook read with `Data(contentsOf:)` would be 920 MB of resident
 /// memory for the sake of a few kilobytes of tags.
-public final class FileHandleRangeReader: ByteRangeReader, @unchecked Sendable {
+public actor FileHandleRangeReader: ByteRangeReader {
     private let handle: FileHandle
     private let length: Int64
-    private let lock = NSLock()
 
     public init(url: URL) throws {
         self.handle = try FileHandle(forReadingFrom: url)
@@ -167,10 +175,10 @@ public final class FileHandleRangeReader: ByteRangeReader, @unchecked Sendable {
 
     public var totalLength: Int64 { length }
 
+    /// Actor isolation serialises the seek-then-read pair. A lock would do the
+    /// same job, but NSLock is unavailable from async contexts and becomes a hard
+    /// error under the Swift 6 language mode.
     public func read(offset: Int64, length count: Int) async throws -> Data {
-        lock.lock()
-        defer { lock.unlock() }
-
         guard offset >= 0, offset < length else { return Data() }
         try handle.seek(toOffset: UInt64(offset))
         return try handle.read(upToCount: count) ?? Data()

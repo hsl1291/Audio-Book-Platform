@@ -261,7 +261,6 @@ public struct MP4AtomReader: Sendable {
                         break
                     }
                 }
-                freeformName = key
                 if let key = key?.uppercased(), let value, !value.isEmpty {
                     switch key {
                     case "NARRATOR", "NARRATED_BY", "COMPOSER":

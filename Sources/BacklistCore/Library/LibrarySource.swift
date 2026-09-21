@@ -1,5 +1,10 @@
 import Foundation
 
+#if canImport(FoundationNetworking)
+// URLRequest lives here rather than in Foundation on non-Apple platforms.
+import FoundationNetworking
+#endif
+
 /// Somewhere playable files can be found.
 ///
 /// The whole app is written against this protocol rather than against any one
