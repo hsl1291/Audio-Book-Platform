@@ -192,7 +192,7 @@ final class StoragePolicyTests: XCTestCase {
 
     func testOnlyDownloadsWhatFits() {
         // One 900 MB resident book, 2 GB budget, three 800 MB books queued.
-        let resident = file(bytes: MB(900), shelf: .owned, played: daysAgo(1), queue: 0)
+        let resident = file(bytes: MB(900), shelf: .owned, queue: 0, played: daysAgo(1))
         let queued = (1...3).map { index in
             file(bytes: MB(800), resident: false, queue: index)
         }

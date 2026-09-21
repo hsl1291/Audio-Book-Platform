@@ -297,7 +297,7 @@ actor CountingReader: ByteRangeReader {
 
     init(_ wrapped: DataRangeReader) { self.wrapped = wrapped }
 
-    var totalLength: Int64 { get async throws { try await wrapped.totalLength } }
+    var totalLength: Int64 { get async throws { wrapped.totalLength } }
 
     func read(offset: Int64, length: Int) async throws -> Data {
         let data = try await wrapped.read(offset: offset, length: length)
