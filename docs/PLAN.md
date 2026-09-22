@@ -112,8 +112,8 @@ with no file.
 |---|---|---|
 | **Waiting to Read** | has a `Copy` · not `finished` · not `abandoned` | Cover grid of everything you own and haven't read. Default landing screen. A book leaves the grid the moment it's marked finished. |
 | **Continue** | `reading` with a saved position | Hero card atop Waiting to Read; one tap resumes. |
-| **Want** | no `Copy` · `Intent` set | The shopping list — what to buy next, wherever you buy it. |
-| **Read** | `finished` | History with rating and review. Imports all 130 from Goodreads, including the ~54 with no file. |
+| **Want** | no `Copy` · `Intent` set | The shopping list — what to buy next, wherever you buy it. Filled by hand; Goodreads' to-read shelf is deliberately not imported. |
+| **Read** | `finished` | History with rating and review. The only thing the Goodreads export feeds: its Read shelf, including the ~54 with no file. |
 
 Covers come from the embedded `covr` atom in each m4b, falling back to Open Library /
 Google Books by ISBN — which is how file-less finished books and everything on the
@@ -229,14 +229,18 @@ displays. Cheap now, painful to retrofit.
 
 ## Phases
 
-### Phase −1: Drive hygiene (no code, do it this week)
+### Phase −1: Drive hygiene — done 2026-09-22
 
-1. Move *Scandalized* and *The Seven Husbands of Evelyn Hugo* out of
-   `Books (Last Download)/` — they exist nowhere else.
-2. Delete the rest of `Books (Last Download)/`. **Reclaims ~37.5 GB.**
-3. Create `Books/_Inbox/` at root and point future downloads there, whatever store
-   they come from, so new files stop landing inside `_Read`.
-4. Export the Goodreads CSV — the Phase 1 fixture and the only source of your ratings.
+Every one of the 98 books in `Books (Last Download)/` was verified to have a
+same-size twin elsewhere — 72 in `_Read`, 24 in `_Too Read`, and 2 in `KRL`. The
+folder-level count here had missed `KRL`, so the two titles thought to exist only in
+the dump folder (*Scandalized*, *The Seven Husbands of Evelyn Hugo*) needed no
+rescue. The folder went to Drive's trash, freeing **48.2 GiB** (the files average
+nearer 500 MB than the 400 MB estimated). *Too Sensitive*, loose at the root and
+unread, moved into `_Too Read`. Result: 106 books, one copy each.
+
+Still the user's to do: export the Goodreads CSV — the only source of ratings and
+reviews, imported as reading history only.
 
 | Phase | Deliverable | Est. |
 |---|---|---|

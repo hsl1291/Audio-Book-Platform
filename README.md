@@ -2,63 +2,58 @@
 
 One place for every book you own, want, and have read.
 
-Audio you own, ebooks you own, what you still need to buy, and where you were in it —
+Audio you own, what you still want, what you have read, and where you were in it —
 offline-first, native iOS, no dependency on any store's app.
 
 Full design: [`docs/PLAN.md`](docs/PLAN.md).
 
 ---
 
-## ⚠️ Read this first: none of this has been compiled
+## Status
 
-This code was written in a Linux container with **no Swift toolchain available**
-(`download.swift.org` is blocked by the environment's network policy). Nothing here
-has been built, run, or type-checked. Expect compile errors on first open and treat
-the first `swift test` run as the real smoke test, not a formality.
+**Built and verified by CI on every push** — the core package's tests on Linux, and
+the full iOS app for the simulator on macOS, under the Swift 6 language mode with
+zero warnings.
 
-The repository is laid out specifically to make that first check fast.
+**Not yet run on a device.** A clean build is not a working app. SwiftData's
+CloudKit constraints, security-scoped folder access and background audio all fail at
+runtime rather than compile time, so the first launch on a phone is where the next
+defects will surface.
 
-## Layout, and why it is split this way
+| Works now | Not built yet |
+|---|---|
+| Pick a Files / iCloud Drive books folder; scan, dedupe, read covers and authors from the files | Streaming or downloading from Google Drive |
+| Waiting to Read, Want (with Add Book), Read, Book Detail | CarPlay library browsing (needs Apple's entitlement) |
+| Playback with chapters, per-book speed, smart rewind, position saved every 15 s | Widgets, Live Activity, Siri |
+| Lock screen, AirPods and in-car Now Playing controls | Kindle import |
+| Goodreads import as reading history, merged with books you have files for | |
+
+## How the tabs are filled
+
+- **Waiting to Read** — every audiobook in your folder you have not finished.
+- **Want** — books you add yourself with the + button.
+- **Read** — your Goodreads history, plus anything filed under `_Read`.
+
+The Goodreads export is used **only as reading history**. Its Read shelf fills the
+Read tab, with your ratings and reviews; its to-read and currently-reading shelves
+are ignored. A book you have both read and kept appears once, matched by ISBN or by
+title and author.
+
+## Layout
 
 ```
 Package.swift              SPM package — Foundation only, builds anywhere
-Sources/BacklistCore/      all parsing, matching and policy logic
-Tests/BacklistCoreTests/   runs with `swift test`, no Xcode, no simulator
+Sources/BacklistCore/      parsing, matching, reconciliation and storage policy
+Tests/BacklistCoreTests/   `swift test`, no Xcode, no simulator
 App/Backlist/              the iOS app: SwiftUI, SwiftData, AVFoundation
 project.yml                XcodeGen spec for the app target
+.github/workflows/ci.yml   Linux tests + macOS app build on every push
 ```
 
-`BacklistCore` deliberately imports **nothing but Foundation**. No SwiftUI, no
-SwiftData, no AVFoundation, no CarPlay. That is what lets you verify the riskiest
-logic in seconds:
-
-```sh
-swift test
-```
-
-Everything platform-bound — SwiftUI screens, SwiftData persistence, the AVPlayer
-engine, CarPlay templates — goes in the iOS app target that depends on this package.
-That boundary is good architecture on its own terms, and it also means a broken
-simulator or an expired provisioning profile never blocks you from checking whether
-the import logic is correct.
-
-## What is here so far
-
-| Component | What it does | Verified against |
-|---|---|---|
-| `FolderNameParser` | Reads the `Title [ID]` convention; distinguishes Audible ASIN from ISBN-10 by full checksum | All 30 real ISBN-10s in the library |
-| `MatchKey` | Normalises titles and authors so the same book matches across sources | Real title/subtitle/diacritic variants |
-| `DuplicateResolver` | Collapses the same book appearing in several folders, reports reclaimable space | The real 202-folder / 106-book shape |
-| `DiscoveredItem` | One found file, plus shelf inference from its path | The nested dump-folder trap |
-| `StoragePolicy` | What stays on the phone out of 41 GB, and what to fetch next | Pinning, eviction order, disk pressure |
-| `GoogleDriveSource` / `LocalFilesSource` | Two interchangeable ways to find files | Drive's quirks, iCloud placeholders |
-
-Models (`Work`, `BookCopy`, `Shelf`, `Journal`, `PlaybackPosition`) are plain value
-types. The SwiftData `@Model` layer sits above them in the app target.
-
-The app target adds the four screens (Waiting to Read, Want, Read, Book Detail),
-the player, and the Now Playing bridge. **None of it is covered by `swift test`** —
-it needs a simulator, and it is the least verified code in the repository.
+`BacklistCore` imports **nothing but Foundation**, and every decision worth arguing
+about lives there — identification, duplicate resolution, Goodreads parsing, which
+scanned book is which imported book, what stays on the phone — so it is covered by
+tests that run in seconds. The app layer is kept thin on purpose.
 
 ## Building the app
 
@@ -68,13 +63,10 @@ xcodegen generate
 open Backlist.xcodeproj
 ```
 
-Before the first build on a device, set `DEVELOPMENT_TEAM` in `project.yml`. The
-paid Apple Developer Program is effectively required: on a free account
-provisioning expires every seven days and the app stops launching, which is not
-acceptable for something holding your listening position.
-
-The `.xcodeproj` is generated rather than committed — it is large, merge-hostile,
-and adds nothing to version control when the inputs are this simple.
+Before the first build on a device, set `DEVELOPMENT_TEAM` in `project.yml`. The paid
+Apple Developer Program is effectively required: on a free account provisioning
+expires every seven days and the app stops launching, which is not acceptable for
+something holding your listening position.
 
 ## The one principle everything follows
 
@@ -83,35 +75,28 @@ playable audio file there is a valid source. The app does not integrate with sto
 hold store credentials, or care how a file arrived — which is what makes switching
 audiobook stores free, and why the app has no DRM surface at all.
 
-Corollary, enforced throughout: the `Title [ID]` naming convention is treated as a
-**hint and never a requirement**, because files from other stores will not follow it.
-Identification is a cascade — embedded MP4 tags first, then the name pattern, then
-fuzzy title/author matching, then a manual fix-up. There will always be a tail; the
-goal is to make correcting it pleasant, not to be perfect.
+The `Title [ID]` naming convention is a **hint, never a requirement**, because files
+from other stores will not follow it. Identification cascades from embedded MP4 tags
+to the name pattern to title-and-author matching.
 
-## Getting started on a Mac
+## The Drive library
 
-```sh
-git clone https://github.com/hsl1291/Audio-Book-Platform.git
-cd Audio-Book-Platform
-swift test          # expect to fix compile errors here first — see the warning above
-```
+Cleaned up on 2026-09-22. `Books (Last Download)` held a second copy of 98 books;
+every one was verified to have a same-size twin elsewhere before the folder was moved
+to Drive's trash (recoverable for 30 days), freeing 48.2 GiB. 106 books remain, one
+copy each: 76 in `_Read`, 28 in `_Too Read`, 2 in `KRL`.
 
-Two things worth doing before writing more code, both in the plan:
-
-1. **Reclaim ~37.5 GB.** Rescue the two titles that exist only in
-   `Books (Last Download)` (*Scandalized*, *The Seven Husbands of Evelyn Hugo*), then
-   delete the rest of that folder — it is 96/98 duplication.
-2. **Export your Goodreads CSV** (My Books → Import and export → Export Library).
-   It is the only source of your ratings and review text, and it is the fixture the
-   importer is built against.
+If Libation is still in use, its output folder will reappear inside `_Read`. The app
+treats that folder as unfiled rather than read, so new downloads still land in
+Waiting to Read — but pointing Libation's output somewhere outside `_Read` avoids the
+clutter.
 
 ## Known open risks
 
-- **Google OAuth scope.** Scanning a folder tree needs `drive.readonly`, a
-  *restricted* scope. An unverified client in Testing mode expires refresh tokens
-  every 7 days. If that holds, the fallback is iCloud Drive via `LocalFilesSource`
-  and no Google at all. Settle this before building the Drive source.
+- **Google OAuth scope.** Scanning a Drive folder tree needs `drive.readonly`, a
+  *restricted* scope; an unverified client in Testing mode expires refresh tokens
+  every 7 days. A Files or iCloud Drive folder avoids OAuth entirely and is the
+  recommended setup.
 - **CarPlay entitlement.** Normally granted to App Store apps; a personal app may be
-  declined. The app is designed to be complete without it — `MPNowPlayingInfoCenter`
-  needs no entitlement and covers most of the driving experience.
+  declined. The app is complete without it — Now Playing needs no entitlement and
+  covers the driving experience except browsing the library on the car's screen.
