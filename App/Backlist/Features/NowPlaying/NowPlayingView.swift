@@ -184,7 +184,7 @@ struct NowPlayingView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                .foregroundStyle(chapter.id == player.currentChapterIndex ? .tint : .primary)
+                .foregroundStyle(chapter.id == player.currentChapterIndex ? Color.accentColor : Color.primary)
             }
             .navigationTitle("Chapters")
             .navigationBarTitleDisplayMode(.inline)

@@ -145,7 +145,7 @@ public struct GoogleDriveSource: LibrarySource {
             ?? (raw["size"] as? NSNumber)?.int64Value
 
         let modified = (raw["modifiedTime"] as? String).flatMap {
-            ISO8601DateFormatter.driveFormatter.date(from: $0)
+            try? Date($0, strategy: GoogleDriveSource.driveTimestamp)
         }
 
         return DriveEntry(
@@ -202,11 +202,13 @@ public struct GoogleDriveSource: LibrarySource {
     }
 }
 
-extension ISO8601DateFormatter {
-    /// Drive timestamps carry fractional seconds; the default formatter rejects them.
-    static let driveFormatter: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter
-    }()
+extension GoogleDriveSource {
+    /// Drive timestamps carry fractional seconds (`2026-09-20T19:10:17.903Z`),
+    /// which the default ISO 8601 parse rejects.
+    ///
+    /// A value-type format style rather than a shared `ISO8601DateFormatter`. The
+    /// formatter is a non-Sendable reference type, so holding one in a static is a
+    /// data race under Swift 6 -- the only one the language mode found in this
+    /// package. The style is Sendable and needs no synchronisation at all.
+    static let driveTimestamp = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
 }

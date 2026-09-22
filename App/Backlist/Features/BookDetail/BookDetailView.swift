@@ -126,7 +126,7 @@ struct BookDetailView: View {
                         } label: {
                             Image(systemName: (work.rating ?? 0) >= star ? "star.fill" : "star")
                                 .font(.title3)
-                                .foregroundStyle((work.rating ?? 0) >= star ? .yellow : .quaternary)
+                                .foregroundStyle((work.rating ?? 0) >= star ? Color.yellow : Color.secondary.opacity(0.4))
                         }
                         .buttonStyle(.plain)
                     }

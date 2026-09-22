@@ -83,7 +83,7 @@ final class NowPlayingBridge {
 
         center.changePlaybackRateCommand.isEnabled = true
         center.changePlaybackRateCommand.supportedPlaybackRates =
-            [0.75, 1.0, 1.25, 1.5, 1.75, 2.0].map(NSNumber.init(value:))
+            [0.75, 1.0, 1.25, 1.5, 1.75, 2.0].map { (rate: Double) in NSNumber(value: rate) }
         center.changePlaybackRateCommand.addTarget { event in
             guard let event = event as? MPChangePlaybackRateCommandEvent else {
                 return .commandFailed

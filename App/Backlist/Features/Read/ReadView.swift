@@ -107,7 +107,7 @@ struct StarsView: View {
             ForEach(1...5, id: \.self) { index in
                 Image(systemName: index <= rating ? "star.fill" : "star")
                     .font(.caption2)
-                    .foregroundStyle(index <= rating ? .yellow : .quaternary)
+                    .foregroundStyle(index <= rating ? Color.yellow : Color.secondary.opacity(0.4))
             }
         }
     }

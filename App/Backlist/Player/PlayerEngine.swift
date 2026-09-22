@@ -95,9 +95,8 @@ final class PlayerEngine: ObservableObject {
 
         var result: [Chapter] = []
         for (index, group) in groups.enumerated() {
-            let title = await (try? group.items
-                .first(where: { $0.commonKey == .commonKeyTitle })?
-                .load(.stringValue)) ?? nil
+            let titleItem = group.items.first { $0.commonKey == .commonKeyTitle }
+            let title = try? await titleItem?.load(.stringValue)
 
             result.append(
                 Chapter(
