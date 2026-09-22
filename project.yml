@@ -37,12 +37,11 @@ targets:
         CURRENT_PROJECT_VERSION: "1"
         INFOPLIST_FILE: App/Backlist/Resources/Info.plist
         CODE_SIGN_ENTITLEMENTS: App/Backlist/Resources/Backlist.entitlements
-        # Swift 5 mode with complete concurrency *checking*: every data-race
-        # diagnostic surfaces as a warning now, and flipping this to "6.0" turns
-        # them into errors as a separate, deliberate step.
-        SWIFT_VERSION: "5.0"
+        # Swift 6 language mode: data races are compile errors. The app was first
+        # brought to zero diagnostics under Swift 5 with complete checking, then
+        # switched, so this never mixed concurrency errors with ordinary ones.
+        SWIFT_VERSION: "6.0"
         ENABLE_USER_SCRIPT_SANDBOXING: YES
-        SWIFT_STRICT_CONCURRENCY: complete
         # Set this to your own team before the first device build. Without it the
         # app runs in the simulator but will not install on a phone.
         DEVELOPMENT_TEAM: ""

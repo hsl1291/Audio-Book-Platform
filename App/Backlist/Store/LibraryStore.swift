@@ -53,7 +53,8 @@ final class LibraryStore {
     func importGoodreads(csv text: String) throws -> GoodreadsCSVImporter.Summary {
         let summary = try GoodreadsCSVImporter().import(csv: text)
 
-        for book in summary.books {
+        // History only: Goodreads fills the Read tab and nothing else.
+        for book in summary.readHistory {
             let existing = try findWork(
                 asin: nil,
                 isbn13: book.work.isbn13,

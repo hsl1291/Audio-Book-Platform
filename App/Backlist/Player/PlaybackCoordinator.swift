@@ -90,7 +90,11 @@ final class PlaybackCoordinator: ObservableObject {
             openRoot = root
             currentWork = work
             currentCopy = copy
-            artwork = await work.coverCacheKey.asyncFlatMap { await CoverCache.shared.image(forKey: $0) }
+            if let key = work.coverCacheKey {
+                artwork = await CoverCache.shared.image(forKey: key)
+            } else {
+                artwork = nil
+            }
 
             await engine.load(
                 copyID: copy.identifier,
@@ -163,12 +167,5 @@ final class PlaybackCoordinator: ObservableObject {
             artwork: artwork,
             isPrivate: work.isPrivate
         ))
-    }
-}
-
-private extension Optional {
-    func asyncFlatMap<T>(_ transform: (Wrapped) async -> T?) async -> T? {
-        guard let value = self else { return nil }
-        return await transform(value)
     }
 }

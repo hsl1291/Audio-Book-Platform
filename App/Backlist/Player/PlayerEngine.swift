@@ -20,7 +20,7 @@ final class PlayerEngine: ObservableObject {
         didSet { if isPlaying { player.rate = rate } }
     }
 
-    struct Chapter: Identifiable, Hashable {
+    struct Chapter: Identifiable, Hashable, Sendable {
         let id: Int
         let title: String
         let start: TimeInterval
@@ -44,9 +44,10 @@ final class PlayerEngine: ObservableObject {
         observeTime()
     }
 
-    deinit {
-        if let timeObserver { player.removeTimeObserver(timeObserver) }
-    }
+    // No deinit removing `timeObserver`. The observer belongs to `player`, which
+    // is released with this object, so removing it first achieves nothing -- and a
+    // nonisolated deinit may not touch main-actor state under Swift 6. The engine
+    // lives for the app's lifetime in practice anyway.
 
     /// `.spokenAudio` is the correct mode for books: it ducks appropriately, and on
     /// CarPlay it tells the system this is speech rather than music, which affects
@@ -68,22 +69,41 @@ final class PlayerEngine: ObservableObject {
         currentCopyID = copyID
         rate = startRate
 
-        let asset = AVURLAsset(url: url)
-        let item = AVPlayerItem(asset: asset)
+        let item = AVPlayerItem(url: url)
         player.replaceCurrentItem(with: item)
 
-        duration = (try? await asset.load(.duration).seconds) ?? 0
-        chapters = await Self.loadChapters(from: asset)
+        let inspected = await Self.inspect(url)
+        duration = inspected.duration
+        chapters = inspected.chapters
 
         await seek(to: start)
         observeEnd(of: item, copyID: copyID)
+    }
+
+    private struct Inspection: Sendable {
+        var duration: TimeInterval
+        var chapters: [Chapter]
+    }
+
+    /// Read duration and chapters off the main actor, handing back only plain
+    /// values.
+    ///
+    /// AVFoundation's asset types are not Sendable. Loading them from main-actor
+    /// code passes each one into AVFoundation's nonisolated async loaders, which
+    /// Swift 6 rightly calls a data race. Creating and using the asset entirely in
+    /// a nonisolated function means no AVFoundation object ever crosses an
+    /// isolation boundary; only the URL goes in and only Sendable values come out.
+    nonisolated private static func inspect(_ url: URL) async -> Inspection {
+        let asset = AVURLAsset(url: url)
+        let duration = (try? await asset.load(.duration).seconds) ?? 0
+        return Inspection(duration: duration, chapters: await loadChapters(from: asset))
     }
 
     /// Chapters come from the file's own chapter track. Parsing these by hand from
     /// the container would mean walking sample tables; `AVAsset` does it correctly
     /// and for free once the file is local, which is why the remote metadata reader
     /// deliberately skips them.
-    private static func loadChapters(from asset: AVAsset) async -> [Chapter] {
+    nonisolated private static func loadChapters(from asset: AVAsset) async -> [Chapter] {
         guard let locales = try? await asset.load(.availableChapterLocales),
               let locale = locales.first
                 ?? Locale.preferredLanguages.first.map(Locale.init(identifier:))

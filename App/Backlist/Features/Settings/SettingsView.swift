@@ -108,7 +108,7 @@ struct SettingsView: View {
         } header: {
             Text("Import")
         } footer: {
-            Text("Goodreads → My Books → Import and export → Export Library. Use the CSV, not a saved copy of the page — only the CSV carries your ratings and reviews.")
+            Text("Fills the Read tab with everything you've finished, including your ratings and reviews. Only your Read shelf is imported. In Goodreads: My Books → Import and export → Export Library, then choose the CSV here.")
         }
     }
 
@@ -124,11 +124,13 @@ struct SettingsView: View {
             let store = LibraryStore(context: context)
             let summary = try store.importGoodreads(csv: text)
             let merged = try store.reconcile()
+            let history = summary.readHistory
             status = """
-                Imported \(summary.books.count) books \
-                (\(summary.finished) read, \(summary.wanted) wanted, \
-                \(summary.rated) rated, \(summary.reviewed) with reviews). \
-                Matched \(merged) to files already in your library.
+                Added \(history.count) books you've read, \
+                \(history.filter { $0.journal.isRated }.count) with ratings and \
+                \(history.filter { $0.journal.hasReview }.count) with reviews. \
+                \(merged) matched audiobooks already in your library. \
+                \(summary.notRead) to-read or current rows were left out.
                 """
         } catch {
             status = "Import failed: \(error.localizedDescription)"

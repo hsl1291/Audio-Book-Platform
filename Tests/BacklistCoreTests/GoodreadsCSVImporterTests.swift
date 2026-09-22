@@ -203,6 +203,25 @@ final class GoodreadsCSVImporterTests: XCTestCase {
         XCTAssertEqual(tags, ["finance", "favourites"])
     }
 
+    // MARK: - Read history only
+
+    func testReadHistoryKeepsOnlyFinishedBooks() throws {
+        // Goodreads is imported as history alone: to-read and currently-reading
+        // rows must not become Want items or anything else.
+        let text = csv(
+            #"1,Read Book,A Author,"Author, A",,="",="",4,4.0,Pub,HB,100,2020,2020,2024/02/01,2024/01/01,read,,read,"Good.",,,1,0"#,
+            #"2,Wanted Book,B Author,"Author, B",,="",="",0,4.0,Pub,HB,100,2020,2020,,2024/01/01,to-read,,to-read,,,,0,0"#,
+            #"3,Current Book,C Author,"Author, C",,="",="",0,4.0,Pub,HB,100,2020,2020,,2024/01/01,currently-reading,,currently-reading,,,,0,0"#
+        )
+        let summary = try GoodreadsCSVImporter().import(csv: text)
+
+        XCTAssertEqual(summary.readHistory.map(\.work.title), ["Read Book"])
+        XCTAssertEqual(summary.notRead, 2)
+        XCTAssertTrue(summary.readHistory.allSatisfy { $0.intent == .none },
+                      "history must never put anything on the shopping list")
+        XCTAssertEqual(summary.books.count, 3, "every row is still parsed")
+    }
+
     // MARK: - Robustness
 
     func testRowWithNoTitleIsSkippedWithAReason() throws {

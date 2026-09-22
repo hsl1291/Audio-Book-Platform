@@ -25,6 +25,18 @@ public struct GoodreadsCSVImporter {
         /// Rows that could not be turned into a book, with the reason.
         public var skipped: [(row: Int, reason: String)]
 
+        /// The books actually finished -- and the only rows Backlist imports.
+        ///
+        /// A Goodreads export is used purely as reading history, to fill the Read
+        /// tab. Its to-read and currently-reading shelves are deliberately ignored:
+        /// what you own and what you want are Backlist's to track, not Goodreads'.
+        /// `books` still carries every row, so this policy is a choice made here
+        /// rather than data thrown away at parse time.
+        public var readHistory: [ImportedBook] { books.filter { $0.shelf == .finished } }
+
+        /// Rows on any other shelf, which the import leaves out.
+        public var notRead: Int { books.count - readHistory.count }
+
         public var rated: Int { books.filter { $0.journal.isRated }.count }
         public var reviewed: Int { books.filter { $0.journal.hasReview }.count }
         public var finished: Int { books.filter { $0.shelf == .finished }.count }

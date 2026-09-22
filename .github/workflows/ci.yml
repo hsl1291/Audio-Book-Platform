@@ -5,8 +5,10 @@ name: CI
 # it covers every judgement call in parsing, matching, identification and the
 # storage policy.
 #
-# The app target needs macOS, which costs ten times the minutes on a private
-# repo, so it is manual-dispatch only rather than running on every push.
+# The app target needs macOS. Its minutes bill at ten times the Linux rate on a
+# private repo, but it runs on every push anyway: the app layer is where the
+# defects have been, and one class of them (types Sendable on Linux but not in
+# Apple's SDK) cannot be caught by the Linux job at all.
 
 on:
   push:
@@ -30,7 +32,6 @@ jobs:
 
   app:
     name: iOS app build (macOS)
-    if: github.event_name == 'workflow_dispatch'
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v5

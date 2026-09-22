@@ -12,6 +12,8 @@ struct WantView: View {
     @Query(sort: \StoredWork.addedAt, order: .reverse)
     private var works: [StoredWork]
 
+    @State private var addingBook = false
+
     private var needToBuy: [StoredWork] {
         works.filter { $0.shelf == .want && !$0.hasPlayableCopy && !$0.isPrivate }
     }
@@ -39,7 +41,7 @@ struct WantView: View {
 
                 Section("Need to buy") {
                     if needToBuy.isEmpty {
-                        Text("Nothing on the list.")
+                        Text("Nothing on the list. Tap + to add a book you want.")
                             .foregroundStyle(.secondary)
                     }
                     ForEach(needToBuy) { work in
@@ -51,6 +53,14 @@ struct WantView: View {
                 }
             }
             .navigationTitle("Want")
+            .toolbar {
+                Button {
+                    addingBook = true
+                } label: {
+                    Label("Add book", systemImage: "plus")
+                }
+            }
+            .sheet(isPresented: $addingBook) { AddBookView() }
             .navigationDestination(for: UUID.self) { id in
                 if let work = works.first(where: { $0.identifier == id }) {
                     BookDetailView(work: work)
