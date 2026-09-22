@@ -22,18 +22,10 @@ public struct LocalFilesSource: LibrarySource {
     public let displayName: String
     public let root: URL
 
-    private let fileManager: FileManager
-
-    public init(
-        root: URL,
-        displayName: String = "Files",
-        identifier: String = "local",
-        fileManager: FileManager = .default
-    ) {
+    public init(root: URL, displayName: String = "Files", identifier: String = "local") {
         self.root = root
         self.displayName = displayName
         self.identifier = identifier
-        self.fileManager = fileManager
     }
 
     public enum Failure: Error, CustomStringConvertible {
@@ -56,7 +48,7 @@ public struct LocalFilesSource: LibrarySource {
 
         while !queue.isEmpty {
             let (directory, path) = queue.removeFirst()
-            let children = try fileManager.contentsOfDirectory(
+            let children = try FileManager.default.contentsOfDirectory(
                 at: directory,
                 includingPropertiesForKeys: [
                     .isDirectoryKey, .fileSizeKey, .contentModificationDateKey,
@@ -131,7 +123,7 @@ public struct LocalFilesSource: LibrarySource {
 
     public func localURL(for item: DiscoveredItem) async throws -> URL? {
         let url = try absoluteURL(for: item)
-        return fileManager.fileExists(atPath: url.path) ? url : nil
+        return FileManager.default.fileExists(atPath: url.path) ? url : nil
     }
 
     /// Ask iCloud for the bytes and wait for them to land.
@@ -140,17 +132,17 @@ public struct LocalFilesSource: LibrarySource {
     /// file during a scan, the expected wait is short, and a query object would
     /// need a run loop this package cannot assume exists.
     func ensureMaterialised(at url: URL, timeout: TimeInterval = 30) async throws {
-        if fileManager.fileExists(atPath: url.path) { return }
+        if FileManager.default.fileExists(atPath: url.path) { return }
 
         #if canImport(Darwin)
         // iCloud ubiquity has no equivalent outside Apple's platforms. Elsewhere
         // a missing file is simply missing, which the timeout below reports.
-        try fileManager.startDownloadingUbiquitousItem(at: url)
+        try FileManager.default.startDownloadingUbiquitousItem(at: url)
         #endif
 
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
-            if fileManager.fileExists(atPath: url.path) { return }
+            if FileManager.default.fileExists(atPath: url.path) { return }
             try await Task.sleep(nanoseconds: 250_000_000)
         }
         throw Failure.unreadable(url)
