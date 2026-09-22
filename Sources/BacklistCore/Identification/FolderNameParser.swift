@@ -101,6 +101,22 @@ public enum FolderNameParser {
         return sum % 11 == 0
     }
 
+    /// Convert an ISBN-10 to the ISBN-13 that denotes the same book.
+    ///
+    /// Goodreads exports ISBN-13 and the folder names carry ISBN-10, so without
+    /// this the 30 ISBN-named books in the library could never match their own
+    /// reading history. Returns nil for anything that is not a valid ISBN-10.
+    public static func isbn13(fromISBN10 isbn10: String) -> String? {
+        guard isValidISBN10(isbn10) else { return nil }
+        let body = "978" + isbn10.prefix(9)
+        var sum = 0
+        for (offset, char) in body.enumerated() {
+            guard let digit = char.wholeNumberValue else { return nil }
+            sum += digit * (offset.isMultiple(of: 2) ? 1 : 3)
+        }
+        return body + String((10 - sum % 10) % 10)
+    }
+
     /// Restore punctuation that filesystem-safe naming destroyed.
     ///
     /// A colon is illegal in many filesystems, so tools substitute `_`. The library
