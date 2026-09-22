@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     container: swift:6.0
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Build
         run: swift build --build-tests
@@ -33,7 +33,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch'
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install XcodeGen
         run: brew install xcodegen
@@ -48,5 +48,5 @@ jobs:
           xcodebuild build \
             -project Backlist.xcodeproj \
             -scheme Backlist \
-            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -destination 'generic/platform=iOS Simulator' \
             CODE_SIGNING_ALLOWED=NO
