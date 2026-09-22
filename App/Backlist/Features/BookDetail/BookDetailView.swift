@@ -6,6 +6,7 @@ import BacklistCore
 struct BookDetailView: View {
     @Environment(\.modelContext) private var context
     @EnvironmentObject private var player: PlayerEngine
+    @EnvironmentObject private var playback: PlaybackCoordinator
 
     @Bindable var work: StoredWork
     @State private var isEditingReview = false
@@ -21,6 +22,12 @@ struct BookDetailView: View {
 
                 if playableCopy != nil {
                     playControls
+                    if let message = playback.lastError {
+                        Text(message)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                 }
 
                 shelfPicker
@@ -211,18 +218,7 @@ struct BookDetailView: View {
     }
 
     private func startPlayback() async {
-        guard let copy = playableCopy, case .localFile(let path)? = copy.sourceRef else {
-            return
-        }
-        let url = URL(fileURLWithPath: path)
-        await player.load(
-            copyID: copy.identifier,
-            url: url,
-            startingAt: copy.positionOffset,
-            rate: Float(copy.playbackRate)
-        )
-        player.play()
-        try? LibraryStore(context: context).markReading(work)
+        await playback.play(work)
     }
 
     private func icon(for copy: StoredCopy) -> String {

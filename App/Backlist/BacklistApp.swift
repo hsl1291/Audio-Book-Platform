@@ -5,9 +5,20 @@ import BacklistCore
 @main
 struct BacklistApp: App {
 
+    private let container: ModelContainer
+    @StateObject private var playback: PlaybackCoordinator
+
+    init() {
+        let container = Self.makeContainer()
+        self.container = container
+        _playback = StateObject(
+            wrappedValue: PlaybackCoordinator(context: container.mainContext)
+        )
+    }
+
     /// CloudKit-backed private store. Only the tracking graph syncs — audio files
     /// stay on each device, which is what keeps a 41 GB library inside a free tier.
-    private let container: ModelContainer = {
+    private static func makeContainer() -> ModelContainer {
         let schema = Schema([StoredWork.self, StoredCopy.self])
         let configuration = ModelConfiguration(
             schema: schema,
@@ -21,14 +32,13 @@ struct BacklistApp: App {
             // failing quietly here would mean losing positions silently.
             fatalError("Could not open the library store: \(error)")
         }
-    }()
-
-    @StateObject private var player = PlayerEngine()
+    }
 
     var body: some Scene {
         WindowGroup {
             RootView()
-                .environmentObject(player)
+                .environmentObject(playback)
+                .environmentObject(playback.engine)
         }
         .modelContainer(container)
     }

@@ -130,17 +130,22 @@ final class LibraryStore {
             let isbn: String?
             switch parsed.catalogID {
             case .asin(let value): asin = value; isbn = nil
-            case .isbn10(let value): asin = nil; isbn = value
+            case .isbn10(let value): asin = nil; isbn = FolderNameParser.isbn13(fromISBN10: value)
             case nil: asin = nil; isbn = nil
             }
 
             let key = MatchKey(title: parsed.title, author: nil)
-            let existing = try findWork(asin: asin, isbn13: nil, matchKey: key)
+            let existing = try findWork(asin: asin, isbn13: isbn, matchKey: key)
 
             let record: StoredWork
             if let existing {
                 record = existing
                 attached += 1
+                // Wanted, and a file has turned up: it is owned now.
+                if record.shelf == .want {
+                    record.shelf = .owned
+                    record.intent = .none
+                }
             } else {
                 record = StoredWork(title: parsed.title)
                 record.addedAt = item.modifiedAt ?? Date()
@@ -201,6 +206,67 @@ final class LibraryStore {
         for copy in record.copies ?? [] where copy.duration == nil {
             copy.duration = metadata.duration
         }
+    }
+
+    // MARK: - Reconciliation
+
+    /// Merge each scanned book into the same book imported from Goodreads.
+    ///
+    /// Without this the library shows every book you have both read and kept
+    /// twice: once from the folder, with the file, and once from Goodreads, with
+    /// your history. The matching decision lives in `Reconciler`, where it is
+    /// tested; this applies it. Safe to run repeatedly.
+    @discardableResult
+    func reconcile() throws -> Int {
+        let works = try allWorks()
+        let hasCopies = { (work: StoredWork) in !(work.copies ?? []).isEmpty }
+
+        // A scanned book with no author yet cannot be matched safely; it will be
+        // eligible once `MetadataEnricher` has read its tags.
+        let fileBacked = works.filter { hasCopies($0) && !$0.authors.isEmpty }
+        let trackedOnly = works.filter { !hasCopies($0) }
+
+        func candidate(_ work: StoredWork) -> Reconciler.Candidate {
+            Reconciler.Candidate(id: work.identifier, key: work.work.matchKey, isbn13: work.isbn13)
+        }
+        let pairs = Reconciler.pairs(
+            fileBacked: fileBacked.map(candidate),
+            trackedOnly: trackedOnly.map(candidate)
+        )
+
+        let byID = Dictionary(works.map { ($0.identifier, $0) }, uniquingKeysWith: { first, _ in first })
+        for pair in pairs {
+            guard let scanned = byID[pair.fileBacked], let tracked = byID[pair.tracked] else { continue }
+            merge(scanned, into: tracked)
+        }
+        try context.save()
+        return pairs.count
+    }
+
+    /// Keep the tracked record, which holds the user's own rating, review and
+    /// dates, and move the files onto it.
+    private func merge(_ scanned: StoredWork, into tracked: StoredWork) {
+        let copies = scanned.copies ?? []
+        // Detach before deleting: `scanned` cascades to its copies, and they must
+        // survive the delete on their new owner.
+        scanned.copies = []
+        for copy in copies { copy.work = tracked }
+
+        tracked.asin = tracked.asin ?? scanned.asin
+        tracked.isbn13 = tracked.isbn13 ?? scanned.isbn13
+        if tracked.authors.isEmpty { tracked.authors = scanned.authors }
+        if tracked.narrators.isEmpty { tracked.narrators = scanned.narrators }
+        tracked.summary = tracked.summary ?? scanned.summary
+        tracked.publishedYear = tracked.publishedYear ?? scanned.publishedYear
+        tracked.coverCacheKey = tracked.coverCacheKey ?? scanned.coverCacheKey
+
+        // A book on the Want list that turns out to have a file is owned: it
+        // belongs in Waiting to Read, not on the shopping list.
+        if tracked.shelf == .want {
+            tracked.shelf = .owned
+            tracked.intent = .none
+        }
+        context.delete(scanned)
     }
 
     // MARK: - Shelf transitions

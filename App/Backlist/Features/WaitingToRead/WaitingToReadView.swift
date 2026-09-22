@@ -9,6 +9,7 @@ import BacklistCore
 struct WaitingToReadView: View {
     @Environment(\.modelContext) private var context
     @EnvironmentObject private var player: PlayerEngine
+    @EnvironmentObject private var playback: PlaybackCoordinator
 
     @Query(sort: \StoredWork.addedAt, order: .reverse)
     private var works: [StoredWork]
@@ -36,9 +37,14 @@ struct WaitingToReadView: View {
         NavigationStack {
             ScrollView {
                 if let continueReading {
-                    ContinueCard(work: continueReading)
-                        .padding(.horizontal)
-                        .padding(.bottom, 8)
+                    Button {
+                        Task { await playback.play(continueReading) }
+                    } label: {
+                        ContinueCard(work: continueReading)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal)
+                    .padding(.bottom, 8)
                 }
 
                 if waiting.isEmpty {

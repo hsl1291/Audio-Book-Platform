@@ -5,6 +5,7 @@ import BacklistCore
 /// Persistent bar above the tab bar. One tap to pause, one tap to open the player.
 struct MiniPlayerBar: View {
     @EnvironmentObject private var player: PlayerEngine
+    @EnvironmentObject private var playback: PlaybackCoordinator
     @State private var showFullPlayer = false
 
     var body: some View {
@@ -27,7 +28,7 @@ struct MiniPlayerBar: View {
             }
 
             Button {
-                player.togglePlayPause()
+                playback.togglePlayPause()
             } label: {
                 Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
                     .font(.title3)
@@ -38,12 +39,17 @@ struct MiniPlayerBar: View {
         .background(.regularMaterial)
         .contentShape(Rectangle())
         .onTapGesture { showFullPlayer = true }
-        .sheet(isPresented: $showFullPlayer) { NowPlayingView() }
+        .sheet(isPresented: $showFullPlayer) {
+            NowPlayingView()
+                .environmentObject(player)
+                .environmentObject(playback)
+        }
     }
 }
 
 struct NowPlayingView: View {
     @EnvironmentObject private var player: PlayerEngine
+    @EnvironmentObject private var playback: PlaybackCoordinator
     @Environment(\.dismiss) private var dismiss
     @State private var scrubbing: Double?
     @State private var showChapters = false
@@ -132,7 +138,7 @@ struct NowPlayingView: View {
             }
 
             Button {
-                player.togglePlayPause()
+                playback.togglePlayPause()
             } label: {
                 Image(systemName: player.isPlaying ? "pause.circle.fill" : "play.circle.fill")
                     .font(.system(size: 64))

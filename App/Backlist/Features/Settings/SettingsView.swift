@@ -31,18 +31,6 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Settings")
-            .fileImporter(
-                isPresented: $importingCSV,
-                allowedContentTypes: [.commaSeparatedText, .plainText]
-            ) { result in
-                handleCSV(result)
-            }
-            .fileImporter(
-                isPresented: $choosingFolder,
-                allowedContentTypes: [.folder]
-            ) { result in
-                handleFolder(result)
-            }
         }
     }
 
@@ -54,6 +42,11 @@ struct SettingsView: View {
                 choosingFolder = true
             } label: {
                 Label("Choose books folder", systemImage: "folder")
+            }
+            // One importer per button: SwiftUI honours only the last
+            // `.fileImporter` on a given view, which silently disabled the other.
+            .fileImporter(isPresented: $choosingFolder, allowedContentTypes: [.folder]) {
+                handleFolder($0)
             }
 
             if let scanReport {
@@ -95,7 +88,7 @@ struct SettingsView: View {
         } header: {
             Text("Storage")
         } footer: {
-            Text("Evicting a download never loses your place. Pinned books are always kept, even past the limit.")
+            Text("These apply to books streamed from Google Drive, which is not connected yet. For a Files or iCloud Drive folder, iOS decides what stays on the device. Evicting a download never loses your place.")
         }
     }
 
@@ -105,6 +98,12 @@ struct SettingsView: View {
                 importingCSV = true
             } label: {
                 Label("Import Goodreads export", systemImage: "square.and.arrow.down")
+            }
+            .fileImporter(
+                isPresented: $importingCSV,
+                allowedContentTypes: [.commaSeparatedText, .plainText]
+            ) {
+                handleCSV($0)
             }
         } header: {
             Text("Import")
@@ -122,11 +121,14 @@ struct SettingsView: View {
             defer { if scoped { url.stopAccessingSecurityScopedResource() } }
 
             let text = try String(contentsOf: url, encoding: .utf8)
-            let summary = try LibraryStore(context: context).importGoodreads(csv: text)
+            let store = LibraryStore(context: context)
+            let summary = try store.importGoodreads(csv: text)
+            let merged = try store.reconcile()
             status = """
                 Imported \(summary.books.count) books \
                 (\(summary.finished) read, \(summary.wanted) wanted, \
-                \(summary.rated) rated, \(summary.reviewed) with reviews).
+                \(summary.rated) rated, \(summary.reviewed) with reviews). \
+                Matched \(merged) to files already in your library.
                 """
         } catch {
             status = "Import failed: \(error.localizedDescription)"
@@ -141,17 +143,27 @@ struct SettingsView: View {
                 defer { if scoped { url.stopAccessingSecurityScopedResource() } }
 
                 // The bookmark is what survives relaunch; without it the folder
-                // must be re-picked every cold start.
-                let bookmark = try url.bookmarkData(
-                    options: .minimalBookmark, includingResourceValuesForKeys: nil,
-                    relativeTo: nil
-                )
-                UserDefaults.standard.set(bookmark, forKey: "booksFolderBookmark")
+                // must be re-picked every cold start, and nothing in it can play.
+                try LibraryFolder.remember(url)
 
-                let source = LocalFilesSource(root: url)
-                let report = try await LibraryStore(context: context).scan(source: source)
+                let store = LibraryStore(context: context)
+                let report = try await store.scan(source: LocalFilesSource(root: url))
                 scanReport = report
-                status = "Scanned \(report.discovered) files into \(report.newWorks + report.attachedToExisting) books."
+                status = "Scanned \(report.discovered) files. Reading covers and authors…"
+
+                // Authors come from the files' own tags, and reconciliation with
+                // Goodreads needs them, so enrichment has to run first.
+                let enriched = await MetadataEnricher.run(context: context, root: url)
+                let merged = try store.reconcile()
+                let pending = enriched.notYetLocal > 0
+                    ? " \(enriched.notYetLocal) are still in iCloud and will fill in once downloaded."
+                    : ""
+                status = """
+                    Scanned \(report.discovered) files into \
+                    \(report.newWorks + report.attachedToExisting) books; \
+                    read details from \(enriched.enriched), matched \(merged) to your \
+                    Goodreads history.\(pending)
+                    """
             } catch {
                 status = "Scan failed: \(error.localizedDescription)"
             }
