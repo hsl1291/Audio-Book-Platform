@@ -15,6 +15,13 @@ final class PlaybackCoordinator: ObservableObject {
 
     let engine = PlayerEngine()
     @Published private(set) var lastError: String?
+    /// Title of a book the user asked to play whose file is still downloading.
+    @Published private(set) var waitingFor: String?
+
+    weak var downloads: DownloadCoordinator?
+
+    /// The copy open in the player, which storage management must never evict.
+    var currentCopyID: UUID? { currentCopy?.identifier }
 
     private let bridge = NowPlayingBridge()
     private let context: ModelContext
@@ -24,6 +31,7 @@ final class PlaybackCoordinator: ObservableObject {
     private var currentCopy: StoredCopy?
     private var artwork: UIImage?
     private var pausedAt: Date?
+    private var pending: (work: StoredWork, requestedAt: Date)?
     /// Security scope of the books folder, held open for as long as a file from it
     /// is playing. Closing it mid-book would cut playback off.
     private var openRoot: URL?
@@ -66,6 +74,8 @@ final class PlaybackCoordinator: ObservableObject {
     /// Start or resume a book from its saved position.
     func play(_ work: StoredWork) async {
         lastError = nil
+        pending = nil
+        waitingFor = nil
         guard let copy = (work.copies ?? []).first(where: \.isPlayable) else {
             lastError = "There is no audio file for this book."
             return
@@ -86,6 +96,9 @@ final class PlaybackCoordinator: ObservableObject {
                 return
             }
 
+            // Save where the outgoing book got to before anything points at the
+            // incoming one; otherwise up to 15 seconds of listening is lost.
+            persistNow()
             openRoot?.stopAccessingSecurityScopedResource()
             openRoot = root
             currentWork = work
@@ -106,8 +119,38 @@ final class PlaybackCoordinator: ObservableObject {
             pausedAt = nil
             try? LibraryStore(context: context).markReading(work)
             publishNowPlaying()
+        } catch LibraryFolder.Failure.fileMissing {
+            // Requested by `fileURL`; start as soon as it lands.
+            pending = (work, Date())
+            waitingFor = work.title
+            downloads?.watchDownloads()
         } catch {
             lastError = error.localizedDescription
+        }
+    }
+
+    /// Forget a book waiting to download, so it will not start on its own.
+    func cancelWaiting() {
+        pending = nil
+        waitingFor = nil
+    }
+
+    /// Called by `DownloadCoordinator` whenever file availability is re-read.
+    ///
+    /// Starts a book the user asked for once its file arrives — but only within a
+    /// few minutes of asking. A download that finishes long after the user gave up
+    /// waiting must not start talking out of a pocket.
+    func availabilityChanged() {
+        guard let pending else { return }
+        guard Date().timeIntervalSince(pending.requestedAt) < 15 * 60 else {
+            cancelWaiting()
+            return
+        }
+        let arrived = (pending.work.copies ?? []).contains {
+            $0.isPlayable && $0.availability == .downloaded
+        }
+        if arrived {
+            Task { await play(pending.work) }
         }
     }
 
@@ -147,6 +190,17 @@ final class PlaybackCoordinator: ObservableObject {
         guard let work = currentWork else { return }
         try? LibraryStore(context: context).markFinished(work)
         publishNowPlaying()
+        // A finished book starts its storage grace period, and the queue has moved.
+        downloads?.refresh()
+    }
+
+    /// Save the live position of the current book immediately.
+    private func persistNow() {
+        guard let copy = currentCopy else { return }
+        persist(
+            copyID: copy.identifier, offset: engine.offset,
+            chapter: engine.currentChapterIndex, rate: engine.rate
+        )
     }
 
     // MARK: - Now Playing

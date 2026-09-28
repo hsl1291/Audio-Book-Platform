@@ -147,6 +147,7 @@ struct AvailabilityBadge: View {
 /// The one-tap resume card at the top of the grid.
 struct ContinueCard: View {
     @EnvironmentObject private var player: PlayerEngine
+    @EnvironmentObject private var playback: PlaybackCoordinator
     let work: StoredWork
 
     private var copy: StoredCopy? {
@@ -165,7 +166,7 @@ struct ContinueCard: View {
                 .clipShape(RoundedRectangle(cornerRadius: 6))
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("Continue")
+                Text(playback.waitingFor == work.title ? "Downloading…" : "Continue")
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(.secondary)
                 Text(work.title)

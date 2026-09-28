@@ -7,6 +7,7 @@ struct BookDetailView: View {
     @Environment(\.modelContext) private var context
     @EnvironmentObject private var player: PlayerEngine
     @EnvironmentObject private var playback: PlaybackCoordinator
+    @EnvironmentObject private var downloads: DownloadCoordinator
 
     @Bindable var work: StoredWork
     @State private var isEditingReview = false
@@ -20,9 +21,10 @@ struct BookDetailView: View {
             VStack(spacing: 20) {
                 header
 
-                if playableCopy != nil {
+                if let copy = playableCopy {
                     playControls
-                    if let message = playback.lastError {
+                    downloadRow(copy)
+                    if let message = playback.lastError ?? downloads.status.lastError {
                         Text(message)
                             .font(.footnote)
                             .foregroundStyle(.secondary)
@@ -107,6 +109,48 @@ struct BookDetailView: View {
             }
             .buttonStyle(.bordered)
         }
+    }
+
+    /// Where the file is, and the one action that makes sense for that state.
+    @ViewBuilder
+    private func downloadRow(_ copy: StoredCopy) -> some View {
+        HStack(spacing: 10) {
+            AvailabilityBadge(availability: copy.availability)
+            switch copy.availability {
+            case .downloaded:
+                Text(copy.isPinned ? "On this iPhone, kept" : "On this iPhone")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                if copy.identifier != playback.currentCopyID {
+                    Button("Remove from iPhone", role: .destructive) {
+                        downloads.removeDownload(work)
+                    }
+                    .font(.footnote)
+                }
+            case .partial:
+                Text(playback.waitingFor == work.title
+                     ? "Downloading — will play when ready"
+                     : "Downloading…")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                if playback.waitingFor == work.title {
+                    Button("Don't auto-play") { playback.cancelWaiting() }
+                        .font(.footnote)
+                }
+            case .cloudOnly:
+                Text("In the cloud")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button("Download") { downloads.download(work) }
+                    .font(.footnote)
+            case .notAFile:
+                EmptyView()
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var shelfPicker: some View {
@@ -209,12 +253,19 @@ struct BookDetailView: View {
     private func bindingForPin(_ copy: StoredCopy) -> Binding<Bool> {
         Binding(
             get: { copy.isPinned },
-            set: { copy.isPinned = $0; try? context.save() }
+            set: { keep in
+                copy.isPinned = keep
+                try? context.save()
+                // Keeping a book is a request to have it here, not just a promise
+                // not to remove it.
+                if keep && copy.availability == .cloudOnly { downloads.download(work) }
+            }
         )
     }
 
     private func markFinished() throws {
         try LibraryStore(context: context).markFinished(work)
+        downloads.refresh()
     }
 
     private func startPlayback() async {

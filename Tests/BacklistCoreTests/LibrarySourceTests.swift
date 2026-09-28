@@ -139,6 +139,24 @@ final class LocalFilesSourceTests: XCTestCase {
         )
     }
 
+    func testPlaceholderIsRecordedUnderItsRealName() async throws {
+        // A stored placeholder path would point at nothing once the real file
+        // arrives, and the book could never be played.
+        let root = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("backlist-placeholder-\(UUID().uuidString)")
+        let folder = root.appendingPathComponent("_Too Read/Outliers [B002UZDRK8]")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try Data([0]).write(to: folder.appendingPathComponent(".Outliers [B002UZDRK8].m4b.icloud"))
+
+        let items = try await LocalFilesSource(root: root).scan()
+        XCTAssertEqual(items.count, 1)
+        XCTAssertEqual(
+            items.first?.sourceRef,
+            .localFile(relativePath: "_Too Read/Outliers [B002UZDRK8]/Outliers [B002UZDRK8].m4b")
+        )
+    }
+
     // MARK: - Round trip against a real directory tree
 
     func testScansARealDirectoryAndInfersShelves() async throws {

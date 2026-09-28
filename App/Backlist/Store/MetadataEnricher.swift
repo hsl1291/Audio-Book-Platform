@@ -17,7 +17,7 @@ enum MetadataEnricher {
         var notYetLocal = 0
     }
 
-    /// Only files already on the device are read. An iCloud placeholder is skipped
+    /// Only files already on the device are read. A cloud placeholder is skipped
     /// rather than downloaded: fetching 400 MB to learn an author's name is exactly
     /// the trade this app exists to avoid.
     static func run(context: ModelContext, root: URL) async -> Report {
@@ -31,9 +31,10 @@ enum MetadataEnricher {
                 report.examined += 1
 
                 let url = root.appendingPathComponent(path)
-                let isLocal = FileManager.default.fileExists(atPath: url.path)
-                copy.availability = isLocal ? .downloaded : .cloudOnly
-                guard isLocal else {
+                // Not `fileExists`: that is true for a dataless cloud item, and
+                // reading one would pull the whole file down.
+                copy.availability = FileAvailability.status(of: url)
+                guard copy.availability == .downloaded else {
                     report.notYetLocal += 1
                     continue
                 }

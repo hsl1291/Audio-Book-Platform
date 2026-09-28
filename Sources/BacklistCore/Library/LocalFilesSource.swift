@@ -54,10 +54,17 @@ public struct LocalFilesSource: LibrarySource {
                     .isDirectoryKey, .fileSizeKey, .contentModificationDateKey,
                     .isUbiquitousItemKey,
                 ],
-                options: [.skipsHiddenFiles]
+                // Not `.skipsHiddenFiles`: iCloud placeholders are named
+                // `.Book.m4b.icloud`, so that option hides every book that is not
+                // already downloaded. Dot-files are filtered below instead, with
+                // placeholders let through.
+                options: []
             )
 
             for child in children {
+                let rawName = child.lastPathComponent
+                if rawName.hasPrefix("."), !rawName.hasSuffix(".icloud") { continue }
+
                 let values = try? child.resourceValues(forKeys: [
                     .isDirectoryKey, .fileSizeKey, .contentModificationDateKey,
                 ])
@@ -70,9 +77,13 @@ public struct LocalFilesSource: LibrarySource {
                 let name = Self.materialisedName(of: child)
                 guard PlayableExtension.matches(name) else { continue }
 
+                // Record the path the file will have once downloaded, not the
+                // placeholder's: `.Book.m4b.icloud` becomes `Book.m4b` on arrival,
+                // and a stored placeholder path would then point at nothing.
+                let materialised = child.deletingLastPathComponent().appendingPathComponent(name)
                 found.append(
                     DiscoveredItem(
-                        sourceRef: .localFile(relativePath: relativePath(of: child)),
+                        sourceRef: .localFile(relativePath: relativePath(of: materialised)),
                         fileName: name,
                         folderName: path.last,
                         pathComponents: path,

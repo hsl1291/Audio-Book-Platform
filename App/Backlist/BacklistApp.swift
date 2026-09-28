@@ -5,42 +5,22 @@ import BacklistCore
 @main
 struct BacklistApp: App {
 
-    private let container: ModelContainer
-    @StateObject private var playback: PlaybackCoordinator
-
-    init() {
-        let container = Self.makeContainer()
-        self.container = container
-        _playback = StateObject(
-            wrappedValue: PlaybackCoordinator(context: container.mainContext)
-        )
-    }
-
-    /// CloudKit-backed private store. Only the tracking graph syncs — audio files
-    /// stay on each device, which is what keeps a 41 GB library inside a free tier.
-    private static func makeContainer() -> ModelContainer {
-        let schema = Schema([StoredWork.self, StoredCopy.self])
-        let configuration = ModelConfiguration(
-            schema: schema,
-            isStoredInMemoryOnly: false,
-            cloudKitDatabase: .automatic
-        )
-        do {
-            return try ModelContainer(for: schema, configurations: configuration)
-        } catch {
-            // A container that cannot open is not recoverable at runtime, and
-            // failing quietly here would mean losing positions silently.
-            fatalError("Could not open the library store: \(error)")
-        }
-    }
+    private let services = AppServices.shared
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
         WindowGroup {
             RootView()
-                .environmentObject(playback)
-                .environmentObject(playback.engine)
+                .environmentObject(services.playback)
+                .environmentObject(services.playback.engine)
+                .environmentObject(services.downloads)
         }
-        .modelContainer(container)
+        .modelContainer(services.container)
+        .onChange(of: scenePhase) { _, phase in
+            // Coming back to the app is when files have most likely changed:
+            // new purchases landed, or a download finished in the background.
+            if phase == .active { services.downloads.refresh() }
+        }
     }
 }
 

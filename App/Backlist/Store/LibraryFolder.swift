@@ -19,7 +19,7 @@ enum LibraryFolder {
             case .noFolderChosen:
                 return "Choose your books folder in Settings first."
             case .fileMissing(let name):
-                return "\(name) isn't on this device yet. It has been requested from iCloud -- try again once it finishes downloading."
+                return "\(name) is downloading. It will start playing as soon as it arrives."
             }
         }
     }
@@ -52,13 +52,14 @@ enum LibraryFolder {
 
     /// Absolute URL of a copy stored relative to the books folder.
     ///
-    /// If the file is an iCloud placeholder, this asks iCloud for it and throws
-    /// rather than blocking: a 400 MB audiobook takes far longer to arrive than any
-    /// reasonable wait on a tap.
+    /// If the bytes are still in the cloud, this asks for them and throws rather
+    /// than blocking: a 400 MB audiobook takes far longer to arrive than any
+    /// reasonable wait on a tap. `fileExists` cannot be used for the check — it is
+    /// true for a dataless cloud item, and opening one stalls until it downloads.
     static func fileURL(relativePath: String, in root: URL) throws -> URL {
         let url = root.appendingPathComponent(relativePath)
-        if FileManager.default.fileExists(atPath: url.path) { return url }
-        try? FileManager.default.startDownloadingUbiquitousItem(at: url)
+        if FileAvailability.status(of: url) == .downloaded { return url }
+        try? FileAvailability.requestDownload(url)
         throw Failure.fileMissing(url.deletingPathExtension().lastPathComponent)
     }
 }

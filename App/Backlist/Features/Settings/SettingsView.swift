@@ -5,6 +5,7 @@ import BacklistCore
 
 struct SettingsView: View {
     @Environment(\.modelContext) private var context
+    @EnvironmentObject private var downloads: DownloadCoordinator
 
     @AppStorage("storageBudgetGB") private var budgetGB: Double = 15
     @AppStorage("autoDownloadCount") private var autoDownloadCount: Int = 3
@@ -72,9 +73,26 @@ struct SettingsView: View {
 
     private var storageSection: some View {
         Section {
+            LabeledContent("On this iPhone") {
+                Text(ByteCountFormatter.string(
+                    fromByteCount: downloads.status.onDeviceBytes, countStyle: .file
+                ))
+            }
+            if downloads.status.downloading > 0 {
+                LabeledContent("Downloading", value: "\(downloads.status.downloading)")
+            }
+            if downloads.status.overBudgetBy > 0 {
+                Text("Books you chose to keep use \(ByteCountFormatter.string(fromByteCount: downloads.status.overBudgetBy, countStyle: .file)) more than the limit. Backlist won't remove them — un-keep some, or raise the limit.")
+                    .font(.footnote)
+                    .foregroundStyle(.orange)
+            }
+
             VStack(alignment: .leading) {
                 LabeledContent("Keep at most", value: "\(Int(budgetGB)) GB")
-                Slider(value: $budgetGB, in: 2...200, step: 1)
+                // Re-plan when the drag ends, not on every step of it.
+                Slider(value: $budgetGB, in: 2...200, step: 1) { editing in
+                    if !editing { downloads.refresh() }
+                }
             }
 
             Stepper("Pre-download \(autoDownloadCount) ahead", value: $autoDownloadCount, in: 0...10)
@@ -88,8 +106,12 @@ struct SettingsView: View {
         } header: {
             Text("Storage")
         } footer: {
-            Text("These apply to books streamed from Google Drive, which is not connected yet. For a Files or iCloud Drive folder, iOS decides what stays on the device. Evicting a download never loses your place.")
+            Text("Backlist keeps your next books downloaded and releases finished ones, asking the folder's cloud service (iCloud Drive, Google Drive and others in Files) to fetch or free them. Removing a download never deletes the book or loses your place. Files stored only on this iPhone are never touched.")
         }
+        .onChange(of: autoDownloadCount) { _, _ in downloads.refresh() }
+        .onChange(of: finishedGraceDays) { _, _ in downloads.refresh() }
+        .onChange(of: requiresWiFi) { _, _ in downloads.refresh() }
+        .onChange(of: requiresCharging) { _, _ in downloads.refresh() }
     }
 
     private var importSection: some View {
@@ -158,7 +180,7 @@ struct SettingsView: View {
                 let enriched = await MetadataEnricher.run(context: context, root: url)
                 let merged = try store.reconcile()
                 let pending = enriched.notYetLocal > 0
-                    ? " \(enriched.notYetLocal) are still in iCloud and will fill in once downloaded."
+                    ? " \(enriched.notYetLocal) are still in the cloud and will fill in once downloaded."
                     : ""
                 status = """
                     Scanned \(report.discovered) files into \
@@ -166,6 +188,7 @@ struct SettingsView: View {
                     read details from \(enriched.enriched), matched \(merged) to your \
                     Goodreads history.\(pending)
                     """
+                downloads.refresh()
             } catch {
                 status = "Scan failed: \(error.localizedDescription)"
             }
