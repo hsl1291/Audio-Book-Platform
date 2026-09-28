@@ -36,6 +36,28 @@
     <key>UIFileSharingEnabled</key>
     <true/>
 
+    <!-- CarPlay library scene. Declared unconditionally; the system connects it
+         only when the app carries the CarPlay audio entitlement, so without the
+         grant this does nothing. The phone's own window scene is SwiftUI's
+         default and needs no entry here. -->
+    <key>UIApplicationSceneManifest</key>
+    <dict>
+        <key>UIApplicationSupportsMultipleScenes</key>
+        <true/>
+        <key>UISceneConfigurations</key>
+        <dict>
+            <key>CPTemplateApplicationSceneSessionRoleApplication</key>
+            <array>
+                <dict>
+                    <key>UISceneConfigurationName</key>
+                    <string>CarPlay</string>
+                    <key>UISceneDelegateClassName</key>
+                    <string>$(PRODUCT_MODULE_NAME).CarPlaySceneDelegate</string>
+                </dict>
+            </array>
+        </dict>
+    </dict>
+
     <key>UILaunchScreen</key>
     <dict/>
 
