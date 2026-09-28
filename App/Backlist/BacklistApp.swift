@@ -22,6 +22,8 @@ struct BacklistApp: App {
             if phase == .active {
                 services.downloads.refresh()
                 services.covers.run()
+                // Tells Siri which book titles "Play … in Backlist" can match.
+                BacklistShortcuts.updateAppShortcutParameters()
             }
         }
     }

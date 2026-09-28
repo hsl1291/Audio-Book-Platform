@@ -165,6 +165,21 @@ final class PlaybackCoordinator: ObservableObject {
         }
     }
 
+    /// The book to pick up when nothing specific is asked for: the one in the
+    /// player, else the most recently played book still in progress.
+    func mostRecentBook() -> StoredWork? {
+        if let currentWork { return currentWork }
+        let reading = ((try? LibraryStore(context: context).allWorks()) ?? [])
+            .filter { $0.shelf == .reading && $0.hasPlayableCopy }
+        return reading.max { a, b in
+            let da = (a.copies ?? []).compactMap(\.lastPlayedAt).max() ?? a.startedAt ?? .distantPast
+            let db = (b.copies ?? []).compactMap(\.lastPlayedAt).max() ?? b.startedAt ?? .distantPast
+            return da < db
+        }
+    }
+
+    var isPlaying: Bool { engine.isPlaying }
+
     func pause() {
         engine.pause()
         pausedAt = Date()
