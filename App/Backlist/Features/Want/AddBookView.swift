@@ -59,6 +59,7 @@ struct AddBookView: View {
         work.intent = .needToPurchase
         context.insert(work)
         try? context.save()
+        AppServices.shared.covers.run()
         dismiss()
     }
 }

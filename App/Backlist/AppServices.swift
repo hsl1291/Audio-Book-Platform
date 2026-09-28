@@ -15,11 +15,13 @@ final class AppServices {
     let container: ModelContainer
     let playback: PlaybackCoordinator
     let downloads: DownloadCoordinator
+    let covers: CoverFetcher
 
     private init() {
         container = Self.makeContainer()
         playback = PlaybackCoordinator(context: container.mainContext)
         downloads = DownloadCoordinator(context: container.mainContext)
+        covers = CoverFetcher(context: container.mainContext)
         playback.downloads = downloads
         downloads.playback = playback
     }

@@ -72,6 +72,7 @@ struct NowPlayingView: View {
                 scrubber
                 transport
                 speedControl
+                sleepTimerStatus
 
                 Spacer()
             }
@@ -82,6 +83,7 @@ struct NowPlayingView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") { dismiss() }
                 }
+                ToolbarItem(placement: .primaryAction) { sleepTimerMenu }
                 ToolbarItem(placement: .primaryAction) {
                     Button {
                         showChapters = true
@@ -170,6 +172,36 @@ struct NowPlayingView: View {
                 }
             }
             .pickerStyle(.segmented)
+        }
+    }
+
+    private var sleepTimerMenu: some View {
+        Menu {
+            ForEach(SleepTimer.presets, id: \.self) { length in
+                Button("\(Int(length / 60)) minutes") {
+                    playback.startSleepTimer(.after(length))
+                }
+            }
+            Button("End of chapter") { playback.startSleepTimer(.endOfChapter) }
+            if playback.sleepTimer.isActive {
+                Divider()
+                Button("Turn off", role: .destructive) { playback.cancelSleepTimer() }
+            }
+        } label: {
+            Image(systemName: playback.sleepTimer.isActive ? "moon.zzz.fill" : "moon.zzz")
+        }
+    }
+
+    @ViewBuilder
+    private var sleepTimerStatus: some View {
+        if let left = playback.sleepTimer.remaining(offset: player.offset, rate: player.rate) {
+            Label {
+                Text("Sleep in \(TimeFormat.clock(left)) · shake to extend")
+            } icon: {
+                Image(systemName: "moon.zzz.fill")
+            }
+            .font(.caption.monospacedDigit())
+            .foregroundStyle(.secondary)
         }
     }
 

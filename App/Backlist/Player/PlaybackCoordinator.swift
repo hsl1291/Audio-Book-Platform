@@ -17,6 +17,7 @@ final class PlaybackCoordinator: ObservableObject {
     @Published private(set) var lastError: String?
     /// Title of a book the user asked to play whose file is still downloading.
     @Published private(set) var waitingFor: String?
+    @Published private(set) var sleepTimer = SleepTimer()
 
     weak var downloads: DownloadCoordinator?
 
@@ -24,6 +25,7 @@ final class PlaybackCoordinator: ObservableObject {
     var currentCopyID: UUID? { currentCopy?.identifier }
 
     private let bridge = NowPlayingBridge()
+    private let shake = ShakeDetector()
     private let context: ModelContext
     private var cancellables: Set<AnyCancellable> = []
 
@@ -67,6 +69,15 @@ final class PlaybackCoordinator: ObservableObject {
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.publishNowPlaying() }
             .store(in: &cancellables)
+
+        // The engine reports position once a second while playing, which is the
+        // sleep timer's clock.
+        engine.$offset
+            .dropFirst()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.tickSleepTimer() }
+            .store(in: &cancellables)
+        shake.onShake = { [weak self] in self?.extendSleepTimer() }
     }
 
     // MARK: - Transport
@@ -157,6 +168,8 @@ final class PlaybackCoordinator: ObservableObject {
     func pause() {
         engine.pause()
         pausedAt = Date()
+        sleepTimer.suspend()
+        shake.stop()
     }
 
     /// Resume, stepping back in proportion to how long playback was paused.
@@ -172,6 +185,42 @@ final class PlaybackCoordinator: ObservableObject {
 
     func togglePlayPause() {
         engine.isPlaying ? pause() : resume()
+    }
+
+    // MARK: - Sleep timer
+
+    func startSleepTimer(_ mode: SleepTimer.Mode) {
+        sleepTimer.start(mode, now: Date(), chapterEnd: engine.currentChapterEnd)
+        if !engine.isPlaying { sleepTimer.suspend() }
+        engine.volume = 1
+    }
+
+    func cancelSleepTimer() {
+        sleepTimer.cancel()
+        engine.volume = 1
+        shake.stop()
+    }
+
+    /// Shake: another full countdown, or one more chapter.
+    func extendSleepTimer() {
+        guard sleepTimer.isActive else { return }
+        sleepTimer.extend(now: Date(), nextChapterEnd: engine.nextChapterEnd)
+        engine.volume = 1
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+    }
+
+    private func tickSleepTimer() {
+        guard sleepTimer.isActive, engine.isPlaying else { return }
+        switch sleepTimer.tick(now: Date(), offset: engine.offset, rate: engine.rate) {
+        case .play(let volume):
+            engine.volume = volume
+            // Listen for a shake only near the end, when it can matter.
+            let left = sleepTimer.remaining(offset: engine.offset, rate: engine.rate) ?? .infinity
+            if left < 60 { shake.start() } else { shake.stop() }
+        case .stop:
+            pause()
+            engine.volume = 1
+        }
     }
 
     // MARK: - Persistence

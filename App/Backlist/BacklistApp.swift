@@ -19,7 +19,10 @@ struct BacklistApp: App {
         .onChange(of: scenePhase) { _, phase in
             // Coming back to the app is when files have most likely changed:
             // new purchases landed, or a download finished in the background.
-            if phase == .active { services.downloads.refresh() }
+            if phase == .active {
+                services.downloads.refresh()
+                services.covers.run()
+            }
         }
     }
 }

@@ -47,6 +47,9 @@ final class StoredWork {
     /// Locally cached cover, keyed by content hash. Never synced.
     var coverCacheKey: String?
     var remoteCoverURL: String?
+    /// When Open Library was last asked for a cover, so a miss is not retried on
+    /// every launch.
+    var coverLookupAt: Date?
 
     @Relationship(deleteRule: .cascade, inverse: \StoredCopy.work)
     var copies: [StoredCopy]? = []

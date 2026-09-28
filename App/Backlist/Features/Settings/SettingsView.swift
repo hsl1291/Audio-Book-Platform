@@ -146,6 +146,7 @@ struct SettingsView: View {
             let store = LibraryStore(context: context)
             let summary = try store.importGoodreads(csv: text)
             let merged = try store.reconcile()
+            AppServices.shared.covers.run()
             let history = summary.readHistory
             status = """
                 Added \(history.count) books you've read, \

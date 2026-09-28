@@ -19,6 +19,25 @@ final class PlayerEngine: ObservableObject {
     @Published var rate: Float = 1.0 {
         didSet { if isPlaying { player.rate = rate } }
     }
+    /// Output level, used by the sleep timer to fade out. Not persisted.
+    var volume: Float = 1.0 {
+        didSet { player.volume = volume }
+    }
+
+    /// Where the current chapter ends, or the book when it has no chapters.
+    var currentChapterEnd: TimeInterval? {
+        if let index = currentChapterIndex, chapters.indices.contains(index) {
+            return chapters[index].end
+        }
+        return duration > 0 ? duration : nil
+    }
+
+    var nextChapterEnd: TimeInterval? {
+        guard let index = currentChapterIndex, chapters.indices.contains(index + 1) else {
+            return nil
+        }
+        return chapters[index + 1].end
+    }
 
     struct Chapter: Identifiable, Hashable, Sendable {
         let id: Int
