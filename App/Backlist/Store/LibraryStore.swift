@@ -103,6 +103,60 @@ final class LibraryStore {
         }
     }
 
+    // MARK: - Kindle import
+
+    struct KindleReport {
+        var added = 0
+        var attachedToExisting = 0
+        var alreadyKnown = 0
+    }
+
+    /// Record Kindle books as owned ebooks.
+    ///
+    /// A Kindle ASIN is never compared with a record's `asin`, which holds the
+    /// audiobook's: the same book has a different ASIN in each format. Matching is
+    /// by the Kindle ASIN already on a copy, then by title and author.
+    @discardableResult
+    func importKindle(_ books: [KindleImporter.Book]) throws -> KindleReport {
+        var report = KindleReport()
+        let works = try allWorks()
+        let knownASINs = Set(works.flatMap { ($0.copies ?? []).compactMap(\.kindleASIN) })
+
+        for book in books {
+            if knownASINs.contains(book.asin) {
+                report.alreadyKnown += 1
+                continue
+            }
+            let record: StoredWork
+            if let existing = try findWork(asin: nil, isbn13: nil, matchKey: book.matchKey) {
+                record = existing
+                report.attachedToExisting += 1
+                if record.shelf == .want {
+                    record.shelf = .owned
+                    record.intent = .none
+                }
+            } else {
+                record = StoredWork(title: book.title)
+                if let author = book.author { record.authors = [author] }
+                record.shelf = .owned
+                record.addedAt = book.acquiredAt ?? Date()
+                context.insert(record)
+                report.added += 1
+            }
+
+            let copy = StoredCopy()
+            copy.format = .ebook
+            copy.provenance = .kindle
+            copy.sourceRef = .kindleASIN(book.asin)
+            copy.availability = .notAFile
+            copy.addedAt = book.acquiredAt ?? Date()
+            copy.work = record
+            context.insert(copy)
+        }
+        try context.save()
+        return report
+    }
+
     // MARK: - Library scan
 
     struct ScanReport {
@@ -220,12 +274,16 @@ final class LibraryStore {
     @discardableResult
     func reconcile() throws -> Int {
         let works = try allWorks()
-        let hasCopies = { (work: StoredWork) in !(work.copies ?? []).isEmpty }
+        // Keyed on audio files, not on copies of any kind: a Goodreads record that
+        // has picked up a Kindle copy must still be able to absorb its audiobook.
+        let hasAudio = { (work: StoredWork) in
+            (work.copies ?? []).contains { $0.format == .audiobook }
+        }
 
         // A scanned book with no author yet cannot be matched safely; it will be
         // eligible once `MetadataEnricher` has read its tags.
-        let fileBacked = works.filter { hasCopies($0) && !$0.authors.isEmpty }
-        let trackedOnly = works.filter { !hasCopies($0) }
+        let fileBacked = works.filter { hasAudio($0) && !$0.authors.isEmpty }
+        let trackedOnly = works.filter { !hasAudio($0) }
 
         func candidate(_ work: StoredWork) -> Reconciler.Candidate {
             Reconciler.Candidate(id: work.identifier, key: work.work.matchKey, isbn13: work.isbn13)

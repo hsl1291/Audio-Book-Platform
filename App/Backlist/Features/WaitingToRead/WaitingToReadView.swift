@@ -15,12 +15,30 @@ struct WaitingToReadView: View {
     private var works: [StoredWork]
 
     @State private var searchText = ""
+    @AppStorage("waitingFormatFilter") private var format: FormatFilter = .all
+
+    enum FormatFilter: String, CaseIterable, Identifiable {
+        case all = "All", audio = "Audio", kindle = "Kindle"
+        var id: Self { self }
+    }
 
     private var waiting: [StoredWork] {
         works
             .filter(\.isWaitingToRead)
             .filter { !$0.isPrivate || showPrivate }
             .filter { matches($0, searchText) }
+            .filter { work in
+                switch format {
+                case .all: return true
+                case .audio: return work.hasPlayableCopy
+                case .kindle: return work.kindleASIN != nil
+                }
+            }
+    }
+
+    /// Chips appear only once there is something to tell apart.
+    private var hasKindleBooks: Bool {
+        works.contains { $0.isWaitingToRead && $0.kindleASIN != nil }
     }
 
     /// The private shelf is revealed only from Settings, and never persists across
@@ -28,7 +46,8 @@ struct WaitingToReadView: View {
     @State private var showPrivate = false
 
     private var continueReading: StoredWork? {
-        works.first { $0.shelf == .reading && !$0.isPrivate }
+        // Only audiobooks: a Kindle book being read cannot be resumed from here.
+        works.first { $0.shelf == .reading && !$0.isPrivate && $0.hasPlayableCopy }
     }
 
     private let columns = [GridItem(.adaptive(minimum: 104, maximum: 160), spacing: 16)]
@@ -43,6 +62,15 @@ struct WaitingToReadView: View {
                         ContinueCard(work: continueReading)
                     }
                     .buttonStyle(.plain)
+                    .padding(.horizontal)
+                    .padding(.bottom, 8)
+                }
+
+                if hasKindleBooks {
+                    Picker("Format", selection: $format) {
+                        ForEach(FormatFilter.allCases) { Text($0.rawValue).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
                     .padding(.horizontal)
                     .padding(.bottom, 8)
                 }
@@ -101,6 +129,17 @@ struct BookTile: View {
                 .overlay(alignment: .bottomTrailing) {
                     AvailabilityBadge(availability: availability)
                         .padding(6)
+                }
+                .overlay(alignment: .topLeading) {
+                    if work.kindleASIN != nil {
+                        Image(systemName: "book.closed.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.white)
+                            .padding(4)
+                            .background(Color.orange, in: RoundedRectangle(cornerRadius: 4))
+                            .padding(6)
+                            .accessibilityLabel("Kindle")
+                    }
                 }
 
             Text(work.title)

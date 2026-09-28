@@ -122,6 +122,10 @@ final class StoredWork {
 
     // MARK: - Derived state the screens query on
 
+    var kindleASIN: String? {
+        (copies ?? []).lazy.compactMap(\.kindleASIN).first
+    }
+
     var hasPlayableCopy: Bool {
         (copies ?? []).contains { $0.isPlayable }
     }

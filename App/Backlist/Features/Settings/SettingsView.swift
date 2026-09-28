@@ -14,6 +14,7 @@ struct SettingsView: View {
     @AppStorage("requiresCharging") private var requiresCharging = false
 
     @State private var importingCSV = false
+    @State private var importingKindle = false
     @State private var choosingFolder = false
     @State private var status: String?
     @State private var scanReport: LibraryStore.ScanReport?
@@ -127,10 +128,23 @@ struct SettingsView: View {
             ) {
                 handleCSV($0)
             }
+
+            Button {
+                importingKindle = true
+            } label: {
+                Label("Import Kindle books", systemImage: "book.closed")
+            }
+            .fileImporter(
+                isPresented: $importingKindle,
+                allowedContentTypes: [.commaSeparatedText, .json, .plainText],
+                allowsMultipleSelection: true
+            ) {
+                handleKindle($0)
+            }
         } header: {
             Text("Import")
         } footer: {
-            Text("Fills the Read tab with everything you've finished, including your ratings and reviews. Only your Read shelf is imported. In Goodreads: My Books → Import and export → Export Library, then choose the CSV here.")
+            Text("Goodreads fills the Read tab with everything you've finished, including your ratings and reviews; only your Read shelf is imported (My Books → Import and export → Export Library). Kindle books come from Amazon's data export (Account → Request Your Data → Kindle); choose any of its CSV or JSON files and Backlist keeps the ones that list books. Run either again any time — nothing is duplicated.")
         }
     }
 
@@ -157,6 +171,34 @@ struct SettingsView: View {
                 """
         } catch {
             status = "Import failed: \(error.localizedDescription)"
+        }
+    }
+
+    private func handleKindle(_ result: Result<[URL], Error>) {
+        do {
+            let urls = try result.get()
+            var summaries: [KindleImporter.Summary] = []
+            for url in urls {
+                let scoped = url.startAccessingSecurityScopedResource()
+                defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+                summaries.append(KindleImporter.import(try Data(contentsOf: url)))
+            }
+            let merged = KindleImporter.merge(summaries)
+            guard !merged.books.isEmpty else {
+                status = "No Kindle books found in \(urls.count == 1 ? "that file" : "those files"). Try the files in the Kindle or Digital Orders folders of the export."
+                return
+            }
+            let store = LibraryStore(context: context)
+            let report = try store.importKindle(merged.books)
+            try store.reconcile()
+            AppServices.shared.covers.run()
+            status = """
+                Found \(merged.books.count) Kindle books: \(report.added) new, \
+                \(report.attachedToExisting) matched to books already here, \
+                \(report.alreadyKnown) already imported.
+                """
+        } catch {
+            status = "Kindle import failed: \(error.localizedDescription)"
         }
     }
 

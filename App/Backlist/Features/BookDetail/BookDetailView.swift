@@ -32,6 +32,10 @@ struct BookDetailView: View {
                     }
                 }
 
+                if let asin = work.kindleASIN {
+                    kindleButton(asin)
+                }
+
                 shelfPicker
                 ratingSection
 
@@ -151,6 +155,24 @@ struct BookDetailView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// Reading happens in the Kindle app; this just gets there in one tap. The
+    /// store page is the fallback when the app is not installed.
+    private func kindleButton(_ asin: String) -> some View {
+        Button {
+            let app = URL(string: "kindle://book?action=open&asin=\(asin)")!
+            let store = URL(string: "https://www.amazon.com/dp/\(asin)")!
+            Task { @MainActor in
+                if !(await UIApplication.shared.open(app)) {
+                    await UIApplication.shared.open(store)
+                }
+            }
+        } label: {
+            Label("Open in Kindle", systemImage: "book.closed")
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.bordered)
     }
 
     private var shelfPicker: some View {
