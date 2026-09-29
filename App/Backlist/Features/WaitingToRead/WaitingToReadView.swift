@@ -10,6 +10,7 @@ struct WaitingToReadView: View {
     @Environment(\.modelContext) private var context
     @EnvironmentObject private var player: PlayerEngine
     @EnvironmentObject private var playback: PlaybackCoordinator
+    @EnvironmentObject private var session: SessionPreferences
 
     @Query(sort: \StoredWork.addedAt, order: .reverse)
     private var works: [StoredWork]
@@ -25,7 +26,7 @@ struct WaitingToReadView: View {
     private var waiting: [StoredWork] {
         works
             .filter(\.isWaitingToRead)
-            .filter { !$0.isPrivate || showPrivate }
+            .filter { !$0.isPrivate || session.showPrivate }
             .filter { matches($0, searchText) }
             .filter { work in
                 switch format {
@@ -40,10 +41,6 @@ struct WaitingToReadView: View {
     private var hasKindleBooks: Bool {
         works.contains { $0.isWaitingToRead && $0.kindleASIN != nil }
     }
-
-    /// The private shelf is revealed only from Settings, and never persists across
-    /// launches — it should not be a state you can forget you left on.
-    @State private var showPrivate = false
 
     private var continueReading: StoredWork? {
         // Only audiobooks: a Kindle book being read cannot be resumed from here.

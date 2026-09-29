@@ -8,6 +8,7 @@ import BacklistCore
 /// it useful whichever store you are buying from this month.
 struct WantView: View {
     @Environment(\.modelContext) private var context
+    @EnvironmentObject private var session: SessionPreferences
 
     @Query(sort: \StoredWork.addedAt, order: .reverse)
     private var works: [StoredWork]
@@ -15,11 +16,15 @@ struct WantView: View {
     @State private var addingBook = false
 
     private var needToBuy: [StoredWork] {
-        works.filter { $0.shelf == .want && !$0.hasPlayableCopy && !$0.isPrivate }
+        works.filter { $0.shelf == .want && !$0.hasPlayableCopy && visible($0) }
     }
 
     private var owned: [StoredWork] {
-        works.filter { $0.shelf == .want && $0.hasPlayableCopy && !$0.isPrivate }
+        works.filter { $0.shelf == .want && $0.hasPlayableCopy && visible($0) }
+    }
+
+    private func visible(_ work: StoredWork) -> Bool {
+        !work.isPrivate || session.showPrivate
     }
 
     var body: some View {

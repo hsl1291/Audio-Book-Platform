@@ -16,6 +16,7 @@ final class AppServices {
     let playback: PlaybackCoordinator
     let downloads: DownloadCoordinator
     let covers: CoverFetcher
+    let session = SessionPreferences()
 
     private init() {
         container = Self.makeContainer()

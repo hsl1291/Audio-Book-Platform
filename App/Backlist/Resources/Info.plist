@@ -19,13 +19,11 @@
 
     <!-- Audio must keep playing when the screen locks or the app backgrounds.
          Without this the player stops the moment the phone locks, which for an
-         audiobook app is total failure. `processing` covers finishing a download
-         that was in flight when the app was backgrounded. -->
+         audiobook app is total failure. No other background mode is needed:
+         downloads are performed by the folder's cloud provider, not by the app. -->
     <key>UIBackgroundModes</key>
     <array>
         <string>audio</string>
-        <string>fetch</string>
-        <string>processing</string>
     </array>
 
     <!-- Lets the user hand a folder or a CSV to the app from Files. -->

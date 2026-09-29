@@ -14,6 +14,7 @@ struct BacklistApp: App {
                 .environmentObject(services.playback)
                 .environmentObject(services.playback.engine)
                 .environmentObject(services.downloads)
+                .environmentObject(services.session)
         }
         .modelContainer(services.container)
         .onChange(of: scenePhase) { _, phase in

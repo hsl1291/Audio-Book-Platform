@@ -9,7 +9,9 @@ import BacklistCore
 /// roughly fifty of those.
 struct ReadView: View {
     @Query private var works: [StoredWork]
+    @EnvironmentObject private var session: SessionPreferences
     @State private var sort: SortOrder = .finishedDescending
+    @State private var searchText = ""
 
     enum SortOrder: String, CaseIterable, Identifiable {
         case finishedDescending = "Recently finished"
@@ -19,7 +21,16 @@ struct ReadView: View {
     }
 
     private var finished: [StoredWork] {
-        let base = works.filter { $0.shelf == .finished && !$0.isPrivate }
+        let needle = MatchKey.normalise(searchText)
+        let base = works.filter { work in
+            guard work.shelf == .finished, !work.isPrivate || session.showPrivate else {
+                return false
+            }
+            guard !needle.isEmpty else { return true }
+            return MatchKey.normalise(work.title).contains(needle)
+                || work.authors.contains { MatchKey.normalise($0).contains(needle) }
+                || MatchKey.normalise(work.review ?? "").contains(needle)
+        }
         switch sort {
         case .finishedDescending:
             // Books with no recorded finish date sort last rather than first —
@@ -49,6 +60,7 @@ struct ReadView: View {
                 }
             }
             .navigationTitle("Read")
+            .searchable(text: $searchText, prompt: "Title, author or review")
             .toolbar {
                 Menu {
                     Picker("Sort", selection: $sort) {

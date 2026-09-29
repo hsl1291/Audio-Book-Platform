@@ -6,6 +6,7 @@ import BacklistCore
 struct SettingsView: View {
     @Environment(\.modelContext) private var context
     @EnvironmentObject private var downloads: DownloadCoordinator
+    @EnvironmentObject private var session: SessionPreferences
 
     @AppStorage("storageBudgetGB") private var budgetGB: Double = 15
     @AppStorage("autoDownloadCount") private var autoDownloadCount: Int = 3
@@ -25,6 +26,7 @@ struct SettingsView: View {
                 librarySection
                 storageSection
                 importSection
+                privacySection
 
                 if let status {
                     Section {
@@ -113,6 +115,16 @@ struct SettingsView: View {
         .onChange(of: finishedGraceDays) { _, _ in downloads.refresh() }
         .onChange(of: requiresWiFi) { _, _ in downloads.refresh() }
         .onChange(of: requiresCharging) { _, _ in downloads.refresh() }
+    }
+
+    private var privacySection: some View {
+        Section {
+            Toggle("Show private books", isOn: $session.showPrivate)
+        } header: {
+            Text("Privacy")
+        } footer: {
+            Text("Private books are hidden from your lists, the widget, CarPlay, Siri and the lock screen. This switch shows them in your lists until you next open the app; nothing else ever shows them.")
+        }
     }
 
     private var importSection: some View {

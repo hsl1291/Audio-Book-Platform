@@ -20,17 +20,49 @@ CloudKit constraints, security-scoped folder access and background audio all fai
 runtime rather than compile time, so the first launch on a phone is where the next
 defects will surface.
 
-| Works now | Not built yet |
+### What is built
+
+| Area | What it does |
 |---|---|
-| Pick a Files / iCloud Drive books folder; scan, dedupe, read covers and authors from the files | Streaming or downloading from Google Drive |
-| Waiting to Read, Want (with Add Book), Read, Book Detail | CarPlay library browsing (needs Apple's entitlement) |
-| Playback with chapters, per-book speed, smart rewind, position saved every 15 s | Widgets, Live Activity, Siri |
-| Lock screen, AirPods and in-car Now Playing controls | Kindle import |
-| Goodreads import as reading history, merged with books you have files for | |
+| **Library** | Pick a books folder in Files (iCloud Drive, Google Drive and others). Scans it, merges duplicates, reads titles, authors, narrators, durations and covers from the files themselves. |
+| **Waiting to Read** | Cover grid of everything you own and haven't finished — audio and Kindle, with All / Audio / Kindle chips — plus a one-tap Continue card. |
+| **Want** | Your shopping list; add books with +. A wanted book moves to Waiting to Read when a file or Kindle copy turns up. |
+| **Read** | Your Goodreads history with ratings and reviews, searchable, merged with books you have files for. |
+| **Covers** | Embedded art from the audio file; Open Library for books with no file. Cached, so they show offline. |
+| **Downloads** | Keeps the next few books on the phone and releases finished ones, within a storage limit, on Wi-Fi (and optionally only while charging). Per-book Download / Remove from iPhone / Keep downloaded. Tapping play on a book in the cloud downloads it and starts it when it arrives. |
+| **Player** | Chapters, per-book speed, smart rewind, position saved every 15 s and when switching books, sleep timer (countdown or end of chapter, fade-out, shake to extend — works with the screen locked). |
+| **Driving** | Lock screen, AirPods and CarPlay Now Playing controls. Siri: "Resume my book in Backlist", "Play *Outliers* in Backlist", "Pause my book in Backlist". A CarPlay library screen, which turns on only if Apple grants the entitlement. |
+| **Widget** | Home Screen (small, medium) and Lock Screen: current book, progress, time left. Tap to resume. |
+| **Kindle** | Import from Amazon's data export; Kindle books appear as owned, with an Open in Kindle button. |
+| **Privacy** | Mark a book private and it is hidden from the lists, widget, CarPlay, Siri and the lock screen. Settings → Show private books reveals them in the lists until the app is next opened. |
+
+### Not built
+
+- **Google Drive direct (OAuth).** The core has a Drive source, but the app reaches
+  Drive through the Files app instead, which needs no sign-in and no Google review.
+- **Manual "this is that book" fix-up** for files the matcher could not identify.
+  They appear as their own entries, titled from the file name.
+- **Live Activity** on the Lock Screen while playing. The standard Now Playing
+  controls already appear there.
+
+### Set up on your phone
+
+1. Mac with Xcode 16 or later: `brew install xcodegen && xcodegen generate`, open
+   `Backlist.xcodeproj`.
+2. In `project.yml`, set `DEVELOPMENT_TEAM` for **both** targets (app and widget)
+   and regenerate. With a paid developer account, Xcode registers the iCloud
+   container and App Group automatically on the first device build.
+3. Build to your iPhone. Settings → **Choose books folder** → your Drive `Books`
+   folder via Files (install Google Drive and enable it under Files → Browse →
+   ⋯ → Edit first).
+4. Settings → **Import Goodreads export** with the CSV from Goodreads.
+5. Optional: Settings → **Import Kindle books** with files from Amazon's data export.
+6. Optional: add the widget; try "Hey Siri, resume my book in Backlist".
 
 ## How the tabs are filled
 
-- **Waiting to Read** — every audiobook in your folder you have not finished.
+- **Waiting to Read** — every audiobook in your folder and every Kindle book you
+  have imported, until you finish it.
 - **Want** — books you add yourself with the + button.
 - **Read** — your Goodreads history, plus anything filed under `_Read`.
 
@@ -43,10 +75,13 @@ title and author.
 
 ```
 Package.swift              SPM package — Foundation only, builds anywhere
-Sources/BacklistCore/      parsing, matching, reconciliation and storage policy
+Sources/BacklistCore/      parsing, matching, reconciliation, storage policy,
+                           sleep timer, Kindle and cover lookups
 Tests/BacklistCoreTests/   `swift test`, no Xcode, no simulator
-App/Backlist/              the iOS app: SwiftUI, SwiftData, AVFoundation
-project.yml                XcodeGen spec for the app target
+App/Backlist/              the iOS app: SwiftUI, SwiftData, AVFoundation,
+                           App Intents, CarPlay
+App/BacklistWidget/        Home Screen and Lock Screen widget extension
+project.yml                XcodeGen spec for both targets
 .github/workflows/ci.yml   Linux tests + macOS app build on every push
 ```
 
@@ -63,7 +98,8 @@ xcodegen generate
 open Backlist.xcodeproj
 ```
 
-Before the first build on a device, set `DEVELOPMENT_TEAM` in `project.yml`. The paid
+Before the first build on a device, set `DEVELOPMENT_TEAM` for both targets in
+`project.yml`. The paid
 Apple Developer Program is effectively required: on a free account provisioning
 expires every seven days and the app stops launching, which is not acceptable for
 something holding your listening position.

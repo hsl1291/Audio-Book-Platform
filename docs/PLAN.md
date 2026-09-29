@@ -181,14 +181,23 @@ sample tables are expensive to walk, and once a file is on the device
 
 41 GB of library against maybe 20 GB of free phone.
 
-- **Pinned** books never evict.
-- **Up Next** (top 3 of the queue) auto-downloads on Wi-Fi + charging via a background
-  `URLSession` with `isDiscretionary`.
-- **Finished** books evict after N days; position retained forever.
-- User-set hard budget (e.g. 15 GB), LRU eviction against it.
-- Every row shows `.downloaded / .partial / .cloudOnly` so offline state is never a
-  surprise.
-- Files in `Application Support`, flagged `isExcludedFromBackup`.
+- **Pinned** ("Keep downloaded") books and the book playing never evict.
+- **Up Next** (top N of the queue, default 3) is requested on Wi-Fi, optionally only
+  while charging.
+- **Finished** books evict after N days, abandoned ones at once; position retained
+  forever.
+- User-set hard budget (default 15 GB), further capped by free disk; least useful
+  evicted first (finished → abandoned → forgotten → played → queued).
+- Every tile shows downloaded / downloading / in the cloud.
+
+**As built:** the app does not download files itself. The books folder is reached
+through Files, so the cloud provider (Google Drive, iCloud Drive…) holds the bytes;
+`DownloadCoordinator` asks it to fetch (`startDownloadingUbiquitousItem`) or release
+(`evictUbiquitousItem`) according to `StoragePolicy`. Release never deletes: a file
+stored only on the phone is left out of the plan entirely, and
+`FileAvailability.removeLocalCopy` refuses anything that is not a cloud item.
+`fileExists` is never used to decide whether a book is local — it is true for
+dataless placeholders, and reading one pulls the whole file.
 
 ### Playback
 
@@ -242,39 +251,45 @@ unread, moved into `_Too Read`. Result: 106 books, one copy each.
 Still the user's to do: export the Goodreads CSV — the only source of ratings and
 reviews, imported as reading history only.
 
-| Phase | Deliverable | Est. |
+| Phase | Deliverable | Status |
 |---|---|---|
-| 0 | Xcode project, SwiftData+CloudKit schema, CI, paid dev account, **CarPlay entitlement filed**, **Google OAuth token-lifetime spike** | 1 wk |
-| 1 | Tracking app: model, Goodreads CSV import, manual add, search, the four screens | 2 wk |
-| 2 | Drive (or iCloud) auth + recursive scan, identification cascade, dedupe/merge, ranged-read metadata + covers | 2.5 wk |
-| 3 | Download manager + storage policy engine + offline state UI | 1.5 wk |
-| 4 | Player: AVQueuePlayer, chapters, speed, sleep timer, Now Playing/remote commands (**this is the CarPlay experience**), position persistence | 2 wk |
-| 5 | Widgets, Live Activity, App Intents/Siri, Lock Screen | 1.5 wk |
-| 6 | CarPlay list templates — **only if entitlement granted** | 1 wk |
-| 7 | Kindle "Request My Data" import, unified cross-format Work view | 1.5 wk |
+| 0 | Xcode project, SwiftData+CloudKit schema, CI | **Built.** Paid dev account and CarPlay entitlement request are the user's |
+| 1 | Tracking app: model, Goodreads CSV import, manual add, search, the four screens | **Built** |
+| 2 | Scan, identification cascade, dedupe/merge, metadata + covers | **Built** via Files; Drive OAuth not used. Manual fix-up UI not built |
+| 3 | Download manager + storage policy engine + offline state UI | **Built** (provider-driven, see above) |
+| 4 | Player: chapters, speed, sleep timer, Now Playing/remote commands, position persistence | **Built** |
+| 5 | Widgets, App Intents/Siri, Lock Screen | **Built.** Live Activity not built |
+| 6 | CarPlay list templates | **Built, inert** until the entitlement is granted |
+| 7 | Kindle import, cross-format view | **Built** |
 
-~12–13 weeks part-time. Phases 1–3 alone already replace Goodreads and the folder tree.
+Everything above compiles under Swift 6 with zero warnings and the core is covered
+by tests, but **none of it has run on a device yet**. That is the next step, and the
+one where runtime-only defects (CloudKit schema rules, security-scoped access,
+background audio, file-provider behaviour) will show up.
 
 ---
 
-## Critical files (new repo — `/home/user/Audio-Book-Platform`, branch `claude/cool-darwin-lgj590`)
+## Critical files (as built)
 
 ```
-Backlist/
-  Models/       Work.swift  Copy.swift  Shelf.swift  Journal.swift
-  Sources/      LibrarySource.swift  GoogleDriveSource.swift
-                LocalFilesSource.swift  M4BMetadataReader.swift
-                BookIdentifier.swift       ← the identification cascade
-  Storage/      DownloadManager.swift  StoragePolicy.swift
-  Player/       PlayerEngine.swift  ChapterController.swift  NowPlayingBridge.swift
-  Import/       GoodreadsCSVImporter.swift  KindleDataImporter.swift
-                DriveLibraryScanner.swift   DuplicateResolver.swift
-  Features/     WaitingToRead/   ← default landing screen, cover grid + Continue card
-                Want/  Read/  BookDetail/  NowPlaying/  Settings/
-  Intents/      ResumeBookIntent.swift
-  CarPlay/      CarPlaySceneDelegate.swift  CarPlayTemplates.swift   (Phase 6, gated)
-BacklistTests/
-BacklistWidgets/
+Sources/BacklistCore/
+  Models/          Work  BookCopy  Shelf
+  Identification/  MatchKey  FolderNameParser  Reconciler
+  Import/          CSVParser  GoodreadsCSVImporter  KindleImporter  DuplicateResolver
+  Library/         LibrarySource  LocalFilesSource  GoogleDriveSource  DiscoveredItem
+  Metadata/        MP4AtomReader  ByteRangeReader  HTTPRangeReader  OpenLibraryCovers
+  Storage/         StoragePolicy
+  Playback/        SleepTimer  WidgetSnapshot
+App/Backlist/
+  AppServices.swift              the one player, download manager, cover fetcher
+  Store/           StoredModels  LibraryStore  LibraryFolder  FileAvailability
+                   DownloadCoordinator  MetadataEnricher  CoverFetcher  SessionPreferences
+  Player/          PlayerEngine  PlaybackCoordinator  NowPlayingBridge
+                   ShakeDetector  WidgetPublisher
+  Features/        WaitingToRead  Want  Read  BookDetail  NowPlaying  Settings
+  Intents/         BookIntents   (resume, pause, play a named book)
+  CarPlay/         CarPlaySceneDelegate   (inert without the entitlement)
+App/BacklistWidget/                Home Screen and Lock Screen widget
 ```
 
 ---
