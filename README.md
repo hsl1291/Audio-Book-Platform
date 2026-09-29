@@ -52,9 +52,13 @@ defects will surface.
 2. In `project.yml`, set `DEVELOPMENT_TEAM` for **both** targets (app and widget)
    and regenerate. With a paid developer account, Xcode registers the iCloud
    container and App Group automatically on the first device build.
-3. Build to your iPhone. Settings → **Choose books folder** → your Drive `Books`
-   folder via Files (install Google Drive and enable it under Files → Browse →
-   ⋯ → Edit first).
+3. Build to your iPhone. Settings → **Choose books folder** → your `Books` folder
+   in Files. **Test this first with one book.** iCloud Drive is known to support
+   what Backlist needs (lasting folder access, fetching and releasing files on
+   demand). Google Drive's Files integration is unverified: if it will not let you
+   pick the folder, or books never finish downloading, move `Books` to iCloud Drive
+   (on a Mac, drag it into iCloud Drive in Finder) and point Libation's output
+   there.
 4. Settings → **Import Goodreads export** with the CSV from Goodreads.
 5. Optional: Settings → **Import Kindle books** with files from Amazon's data export.
 6. Optional: add the widget; try "Hey Siri, resume my book in Backlist".
@@ -128,6 +132,9 @@ Waiting to Read — but pointing Libation's output somewhere outside `_Read` avo
 clutter.
 
 ## Known open risks
+
+- **Google Drive through Files.** Untested on a device; see step 3 above. iCloud
+  Drive is the safe choice.
 
 - **Google OAuth scope.** Scanning a Drive folder tree needs `drive.readonly`, a
   *restricted* scope; an unverified client in Testing mode expires refresh tokens
