@@ -30,6 +30,7 @@ targets:
       - path: App/Backlist
     dependencies:
       - package: BacklistCore
+      - target: BacklistWidget
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.backlist.app
@@ -44,4 +45,25 @@ targets:
         ENABLE_USER_SCRIPT_SANDBOXING: YES
         # Set this to your own team before the first device build. Without it the
         # app runs in the simulator but will not install on a phone.
+        DEVELOPMENT_TEAM: ""
+
+  # Home Screen and Lock Screen widget. Reads a snapshot the app writes to the
+  # shared App Group; it never opens the library database.
+  BacklistWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: App/BacklistWidget
+    dependencies:
+      - package: BacklistCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.backlist.app.widget
+        # Must match the app's, or installing the build is refused.
+        MARKETING_VERSION: "0.1"
+        CURRENT_PROJECT_VERSION: "1"
+        INFOPLIST_FILE: App/BacklistWidget/Info.plist
+        CODE_SIGN_ENTITLEMENTS: App/BacklistWidget/BacklistWidget.entitlements
+        SWIFT_VERSION: "6.0"
+        ENABLE_USER_SCRIPT_SANDBOXING: YES
         DEVELOPMENT_TEAM: ""

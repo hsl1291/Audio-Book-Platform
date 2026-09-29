@@ -26,6 +26,7 @@ final class PlaybackCoordinator: ObservableObject {
 
     private let bridge = NowPlayingBridge()
     private let shake = ShakeDetector()
+    private let widgets = WidgetPublisher()
     private let context: ModelContext
     private var cancellables: Set<AnyCancellable> = []
 
@@ -130,6 +131,7 @@ final class PlaybackCoordinator: ObservableObject {
             pausedAt = nil
             try? LibraryStore(context: context).markReading(work)
             publishNowPlaying()
+            publishWidget()
         } catch LibraryFolder.Failure.fileMissing {
             // Requested by `fileURL`; start as soon as it lands.
             pending = (work, Date())
@@ -185,6 +187,7 @@ final class PlaybackCoordinator: ObservableObject {
         pausedAt = Date()
         sleepTimer.suspend()
         shake.stop()
+        publishWidget()
     }
 
     /// Resume, stepping back in proportion to how long playback was paused.
@@ -195,6 +198,7 @@ final class PlaybackCoordinator: ObservableObject {
             }
             pausedAt = nil
             engine.play()
+            publishWidget()
         }
     }
 
@@ -248,6 +252,7 @@ final class PlaybackCoordinator: ObservableObject {
         copy.playbackRate = Double(rate)
         copy.lastPlayedAt = Date()
         try? context.save()
+        publishWidget()
     }
 
     private func bookEnded() {
@@ -265,6 +270,42 @@ final class PlaybackCoordinator: ObservableObject {
             copyID: copy.identifier, offset: engine.offset,
             chapter: engine.currentChapterIndex, rate: engine.rate
         )
+    }
+
+    // MARK: - Widget
+
+    /// Show the book in the player, or, before anything has been played this
+    /// launch, the one that would resume.
+    func publishWidget() {
+        if let work = currentWork, let copy = currentCopy {
+            widgets.publish(.init(
+                title: work.title, author: work.authors.first,
+                chapterTitle: engine.currentChapterTitle,
+                offset: engine.offset,
+                duration: engine.duration > 0 ? engine.duration : (copy.duration ?? 0),
+                rate: Double(engine.rate), isPlaying: engine.isPlaying,
+                coverKey: work.coverCacheKey, isPrivate: work.isPrivate
+            ))
+        } else if let work = mostRecentBook(),
+                  let copy = (work.copies ?? []).first(where: \.isPlayable) {
+            widgets.publish(.init(
+                title: work.title, author: work.authors.first, chapterTitle: nil,
+                offset: copy.positionOffset, duration: copy.duration ?? 0,
+                rate: copy.playbackRate, isPlaying: false,
+                coverKey: work.coverCacheKey, isPrivate: work.isPrivate
+            ))
+        } else {
+            widgets.publish(nil)
+        }
+    }
+
+    /// Tapping the widget: resume whatever it was showing.
+    func continueFromWidget() async {
+        if currentWork != nil {
+            resume()
+        } else if let work = mostRecentBook() {
+            await play(work)
+        }
     }
 
     // MARK: - Now Playing

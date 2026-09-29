@@ -24,6 +24,7 @@ struct BacklistApp: App {
                 services.covers.run()
                 // Tells Siri which book titles "Play … in Backlist" can match.
                 BacklistShortcuts.updateAppShortcutParameters()
+                services.playback.publishWidget()
             }
         }
     }
@@ -32,6 +33,7 @@ struct BacklistApp: App {
 struct RootView: View {
     @Environment(\.modelContext) private var context
     @EnvironmentObject private var player: PlayerEngine
+    @EnvironmentObject private var playback: PlaybackCoordinator
     @State private var selection: Tab = .waiting
 
     enum Tab: Hashable {
@@ -55,6 +57,11 @@ struct RootView: View {
             SettingsView()
                 .tabItem { Label("Settings", systemImage: "gear") }
                 .tag(Tab.settings)
+        }
+        .onOpenURL { url in
+            guard url == WidgetSnapshot.continueURL else { return }
+            selection = .waiting
+            Task { await playback.continueFromWidget() }
         }
         .safeAreaInset(edge: .bottom) {
             if player.currentCopyID != nil {

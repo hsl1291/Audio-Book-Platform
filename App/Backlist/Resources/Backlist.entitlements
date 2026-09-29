@@ -19,6 +19,13 @@
     <key>aps-environment</key>
     <string>development</string>
 
+    <!-- Shared with the widget extension, which draws the current book from a
+         snapshot the app writes here. -->
+    <key>com.apple.security.application-groups</key>
+    <array>
+        <string>group.com.backlist.app</string>
+    </array>
+
     <!-- CarPlay audio is NOT requested here on purpose.
          The entitlement must be granted by Apple and is normally reserved for
          App Store apps, so a personal build may never receive one. Adding the key
